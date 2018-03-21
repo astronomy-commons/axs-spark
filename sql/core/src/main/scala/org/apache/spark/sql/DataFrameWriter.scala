@@ -198,6 +198,18 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) {
   def bucketBy(numBuckets: Int, colName: String, colNames: String*): DataFrameWriter[T] = {
     this.numBuckets = Option(numBuckets)
     this.bucketColumnNames = Option(colName +: colNames)
+    this.bucketingType = Some(BucketingType.HASH)
+    this.bucketMinValue = None
+    this.bucketMaxValue = None
+    this
+  }
+
+  def bucketByFixedRange(numBuckets: Int, minValue: Long, maxValue: Long, colName: String): DataFrameWriter[T] = {
+    this.numBuckets = Option(numBuckets)
+    this.bucketColumnNames = Option(Seq(colName))
+    this.bucketingType = Some(BucketingType.SEQUENTIAL)
+    this.bucketMinValue = Some(minValue)
+    this.bucketMaxValue = Some(maxValue)
     this
   }
 
@@ -335,7 +347,8 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) {
     }
 
     numBuckets.map { n =>
-      BucketSpec(n, bucketColumnNames.get, sortColumnNames.getOrElse(Nil))
+      BucketSpec(n, bucketColumnNames.get, sortColumnNames.getOrElse(Nil), bucketingType.getOrElse(BucketingType.HASH),
+        bucketMinValue, bucketMaxValue)
     }
   }
 
@@ -676,6 +689,12 @@ final class DataFrameWriter[T] private[sql](ds: Dataset[T]) {
   private var partitioningColumns: Option[Seq[String]] = None
 
   private var bucketColumnNames: Option[Seq[String]] = None
+
+  private var bucketingType: Option[BucketingType] = None
+
+  private var bucketMinValue: Option[Long] = None
+
+  private var bucketMaxValue: Option[Long] = None
 
   private var numBuckets: Option[Int] = None
 

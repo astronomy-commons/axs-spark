@@ -18,18 +18,16 @@
 package org.apache.spark.sql.execution
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.commons.lang3.StringUtils
 import org.apache.hadoop.fs.{BlockLocation, FileStatus, LocatedFileStatus, Path}
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.{InternalRow, TableIdentifier}
-import org.apache.spark.sql.catalyst.catalog.BucketSpec
+import org.apache.spark.sql.catalyst.catalog.{BucketSpec, BucketingType}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenContext
 import org.apache.spark.sql.catalyst.plans.QueryPlan
-import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning, UnknownPartitioning}
+import org.apache.spark.sql.catalyst.plans.physical.{FixedRangePartitioning, HashPartitioning, Partitioning, UnknownPartitioning}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.{ParquetFileFormat => ParquetSource}
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -223,15 +221,31 @@ case class FileSourceScanExec(
         // If sort columns are (col1, col0), then sort ordering would be empty as per rule #2
         // above
 
+        logDebug(s"File source scan got bucket spec: ${spec.toString}")
+
         def toAttribute(colName: String): Option[Attribute] =
           output.find(_.name == colName)
 
         val bucketColumns = spec.bucketColumnNames.flatMap(n => toAttribute(n))
+
+        logDebug(s"File source scan got bucket columns: ${bucketColumns.mkString(", ")}")
+
         if (bucketColumns.size == spec.bucketColumnNames.size) {
-          val partitioning = HashPartitioning(bucketColumns, spec.numBuckets)
           val sortColumns =
             spec.sortColumnNames.map(x => toAttribute(x)).takeWhile(x => x.isDefined).map(_.get)
 
+          logDebug(s"File source scan got sort columns: ${sortColumns.mkString(", ")}")
+
+          val partitioning = spec.bucketingType match {
+            case BucketingType.SEQUENTIAL =>
+              if(spec.minValue.isDefined && spec.maxValue.isDefined && sortColumns.size > 0 &&
+                  bucketColumns.size == 1 && sortColumns.contains(bucketColumns(0)))
+                FixedRangePartitioning((sortColumns.map(attr => SortOrder(attr, Ascending))).head,
+                  spec.numBuckets, spec.minValue.get, spec.maxValue.get)
+              else
+                HashPartitioning (bucketColumns, spec.numBuckets)
+            case _ => HashPartitioning (bucketColumns, spec.numBuckets)
+          }
           val sortOrder = if (sortColumns.nonEmpty) {
             // In case of bucketing, its possible to have multiple files belonging to the
             // same bucket in a given relation. Each of these files are locally sorted

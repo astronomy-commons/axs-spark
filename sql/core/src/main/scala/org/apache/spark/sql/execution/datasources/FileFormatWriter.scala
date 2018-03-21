@@ -20,13 +20,11 @@ package org.apache.spark.sql.execution.datasources
 import java.util.{Date, UUID}
 
 import scala.collection.mutable
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
-
 import org.apache.spark._
 import org.apache.spark.internal.Logging
 import org.apache.spark.internal.io.{FileCommitProtocol, SparkHadoopWriterUtils}
@@ -34,12 +32,12 @@ import org.apache.spark.internal.io.FileCommitProtocol.TaskCommitMessage
 import org.apache.spark.shuffle.FetchFailedException
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.catalog.{BucketSpec, ExternalCatalogUtils}
+import org.apache.spark.sql.catalyst.catalog.{BucketSpec, BucketingType, CatalogUtils, ExternalCatalogUtils}
 import org.apache.spark.sql.catalyst.catalog.CatalogTypes.TablePartitionSpec
 import org.apache.spark.sql.catalyst.expressions.{UnsafeProjection, _}
-import org.apache.spark.sql.catalyst.plans.physical.HashPartitioning
+import org.apache.spark.sql.catalyst.plans.physical.{FixedRangePartitioning, HashPartitioning, RangePartitioning}
 import org.apache.spark.sql.catalyst.util.{CaseInsensitiveMap, DateTimeUtils}
-import org.apache.spark.sql.execution.{SortExec, SparkPlan, SQLExecution}
+import org.apache.spark.sql.execution.{SQLExecution, SortExec, SparkPlan}
 import org.apache.spark.sql.types.StringType
 import org.apache.spark.util.{SerializableConfiguration, Utils}
 
@@ -122,13 +120,20 @@ object FileFormatWriter extends Logging {
     val partitionSet = AttributeSet(partitionColumns)
     val dataColumns = outputSpec.outputColumns.filterNot(partitionSet.contains)
 
-    val bucketIdExpression = bucketSpec.map { spec =>
-      val bucketColumns = spec.bucketColumnNames.map(c => dataColumns.find(_.name == c).get)
-      // Use `HashPartitioning.partitionIdExpression` as our bucket id expression, so that we can
-      // guarantee the data distribution is same between shuffle and bucketed data source, which
-      // enables us to only shuffle one side when join a bucketed table and a normal one.
-      HashPartitioning(bucketColumns, spec.numBuckets).partitionIdExpression
-    }
+    val bucketIdExpression = bucketSpec.map { spec => {
+      spec.bucketingType match {
+        case BucketingType.HASH =>
+          val bucketColumns = spec.bucketColumnNames.map(c => dataColumns.find(_.name == c).get)
+          // Use `HashPartitioning.partitionIdExpression` as our bucket id expression, so that we can
+          // guarantee the data distribution is same between shuffle and bucketed data source, which
+          // enables us to only shuffle one side when join a bucketed table and a normal one.
+          HashPartitioning(bucketColumns, spec.numBuckets).partitionIdExpression
+        case BucketingType.SEQUENTIAL =>
+          //val bucketColumns = spec.bucketColumnNames.map(c => plan.requiredChildOrdering.flatten.find(_.child.toString == c).get)
+          val bucketColumns = spec.bucketColumnNames.map(c => SortOrder(dataColumns.find(_.name == c).get, Ascending))
+          FixedRangePartitioning(bucketColumns(0), spec.numBuckets, spec.minValue.get, spec.maxValue.get).partitionIdExpression
+      }
+    }}
     val sortColumns = bucketSpec.toSeq.flatMap {
       spec => spec.sortColumnNames.map(c => dataColumns.find(_.name == c).get)
     }

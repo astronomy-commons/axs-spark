@@ -22,15 +22,13 @@ import java.util.{Locale, ServiceConfigurationError, ServiceLoader}
 import scala.collection.JavaConverters._
 import scala.language.{existentials, implicitConversions}
 import scala.util.{Failure, Success, Try}
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.analysis.UnresolvedAttribute
-import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogStorageFormat, CatalogTable, CatalogUtils}
+import org.apache.spark.sql.catalyst.catalog._
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
@@ -403,12 +401,29 @@ case class DataSource(
           new InMemoryFileIndex(
             sparkSession, globbedPaths, options, Some(partitionSchema), fileStatusCache)
         }
+        //Sequential bucketing information is not stored in the metastore.
+        //User has to specify the parameters through options.
+        //User-specified bucketing specification overrides spec from metastore (if any).
+//        var bspec = bucketSpec
+//        if(bucketSpec.isEmpty)
+          val bspec = if(options.contains(BucketSpec.BUCKET_TYPE_OPTION) &&
+                options(BucketSpec.BUCKET_TYPE_OPTION).toLowerCase.equals("sequential") &&
+                options.contains(BucketSpec.BUCKET_MIN_VALUE_OPTION) &&
+                options.contains(BucketSpec.BUCKET_MAX_VALUE_OPTION) &&
+                options.contains(BucketSpec.NUM_BUCKETS_OPTION) &&
+                options.contains(BucketSpec.BUCKETING_COL_OPTION) &&
+                options.contains(BucketSpec.SORT_COLS_OPTION))
+              Some(BucketSpec(options(BucketSpec.NUM_BUCKETS_OPTION).toInt, Seq(options(BucketSpec.BUCKETING_COL_OPTION)),
+                options(BucketSpec.SORT_COLS_OPTION).split(",").toSeq, BucketingType.SEQUENTIAL,
+                Some(options(BucketSpec.BUCKET_MIN_VALUE_OPTION).toLong), Some(options(BucketSpec.BUCKET_MAX_VALUE_OPTION).toLong)))
+            else
+              None
 
         HadoopFsRelation(
           fileCatalog,
           partitionSchema = partitionSchema,
           dataSchema = dataSchema.asNullable,
-          bucketSpec = bucketSpec,
+          bucketSpec = bspec,
           format,
           caseInsensitiveOptions)(sparkSession)
 

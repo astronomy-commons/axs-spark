@@ -560,6 +560,9 @@ trait CheckAnalysis extends PredicateHelper {
       case r: RepartitionByExpression =>
         failOnInvalidOuterReference(r)
 
+      case r: FixedRangeRepartitionByExpression =>
+        failOnInvalidOuterReference(r)
+
       // Category 3:
       // Filter is one of the two operators allowed to host correlated expressions.
       // The other operator is Join. Filter can be anywhere in a correlated subquery.

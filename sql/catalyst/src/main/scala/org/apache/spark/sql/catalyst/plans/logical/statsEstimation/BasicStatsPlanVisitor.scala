@@ -67,6 +67,8 @@ object BasicStatsPlanVisitor extends LogicalPlanVisitor[Statistics] {
 
   override def visitRepartitionByExpr(p: RepartitionByExpression): Statistics = fallback(p)
 
+  override def visitFixedRangeRepartitionByExpr(p: FixedRangeRepartitionByExpression): Statistics = fallback(p)
+
   override def visitSample(p: Sample): Statistics = fallback(p)
 
   override def visitScriptTransform(p: ScriptTransformation): Statistics = fallback(p)

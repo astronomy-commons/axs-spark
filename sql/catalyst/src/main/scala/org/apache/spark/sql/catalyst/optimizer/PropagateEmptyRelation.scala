@@ -85,6 +85,7 @@ object PropagateEmptyRelation extends Rule[LogicalPlan] with PredicateHelper {
       case _: LocalLimit => empty(p)
       case _: Repartition => empty(p)
       case _: RepartitionByExpression => empty(p)
+      case _: FixedRangeRepartitionByExpression => empty(p)
       // An aggregate with non-empty group expression will return one output row per group when the
       // input to the aggregate is not empty. If the input to the aggregate is empty then all groups
       // will be empty and thus the output will be empty. If we're working on batch data, we can

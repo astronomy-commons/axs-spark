@@ -347,3 +347,89 @@ private[spark] object RangePartitioner {
     bounds.toArray
   }
 }
+
+class FixedRangePartitioner(
+    partitions: Int,
+    minValue: Long,
+    maxValue: Long,
+    private var ascending: Boolean = true)
+  extends Partitioner {
+
+  // We allow partitions = 0, which happens when sorting an empty RDD under the default settings.
+  require(partitions >= 0, s"Number of partitions cannot be negative but found $partitions.")
+
+  private var ordering = implicitly[Ordering[Long]]
+  private var minVal = minValue
+  private var maxVal = maxValue
+  private var bucketSize:Double = (maxValue - minValue).toDouble / partitions
+
+  def numPartitions: Int = partitions
+
+  def getPartition(key: Any): Int = {
+    val k:Long = key match {
+      case i: Int => i.toLong
+      case l: Long => l
+      case s: Short => s.toLong
+      case _ => key.asInstanceOf[Long]
+    }
+    var partition = ((k - minValue) / bucketSize).toInt
+
+    if(partition < 0)
+      partition = 0
+    if(partition >= numPartitions)
+      partition = numPartitions - 1
+
+    if (ascending) {
+      partition
+    } else {
+      numPartitions - partition
+    }
+  }
+
+  override def equals(other: Any): Boolean = other match {
+    case r: FixedRangePartitioner =>
+      r.numPartitions == numPartitions && r.minVal == minVal && r.maxVal == maxVal && r.ascending == ascending
+    case _ =>
+      false
+  }
+
+  override def hashCode(): Int = {
+    val prime = 31
+    var result = 1
+    var i = 0
+    result = prime + numPartitions.hashCode()
+    result = prime * result + minValue.hashCode()
+    result = prime * result + maxValue.hashCode()
+    result = prime * result + bucketSize.hashCode()
+    result = prime * result + ascending.hashCode
+    result
+  }
+
+  @throws(classOf[IOException])
+  private def writeObject(out: ObjectOutputStream): Unit = Utils.tryOrIOException {
+    val sfactory = SparkEnv.get.serializer
+    sfactory match {
+      case js: JavaSerializer => out.defaultWriteObject()
+      case _ =>
+        out.writeBoolean(ascending)
+        out.writeLong(minVal)
+        out.writeLong(maxVal)
+        out.writeDouble(bucketSize)
+        out.writeObject(ordering)
+    }
+  }
+
+  @throws(classOf[IOException])
+  private def readObject(in: ObjectInputStream): Unit = Utils.tryOrIOException {
+    val sfactory = SparkEnv.get.serializer
+    sfactory match {
+      case js: JavaSerializer => in.defaultReadObject()
+      case _ =>
+        ascending = in.readBoolean()
+        minVal = in.readLong()
+        maxVal = in.readLong()
+        bucketSize = in.readDouble()
+        ordering = in.readObject().asInstanceOf[Ordering[Long]]
+    }
+  }
+}

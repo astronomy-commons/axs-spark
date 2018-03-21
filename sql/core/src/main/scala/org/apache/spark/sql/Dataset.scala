@@ -2859,6 +2859,17 @@ class Dataset[T] private[sql](
     repartitionByRange(sparkSession.sessionState.conf.numShufflePartitions, partitionExprs: _*)
   }
 
+  def repartitionByFixedRange(numPartitions: Int, partitionExpr: Column, minValue: Long, maxValue: Long): Dataset[T] = {
+    require(minValue < maxValue, "minValue must be smaller than maxValue")
+    val sortOrder: SortOrder = partitionExpr.expr match {
+      case expr: SortOrder => expr
+      case expr: Expression => SortOrder(expr, Ascending)
+    }
+    withTypedPlan {
+      FixedRangeRepartitionByExpression(sortOrder, planWithBarrier, numPartitions, minValue, maxValue)
+    }
+  }
+
   /**
    * Returns a new Dataset that has exactly `numPartitions` partitions, when the fewer partitions
    * are requested. If a larger number of partitions is requested, it will stay at the current

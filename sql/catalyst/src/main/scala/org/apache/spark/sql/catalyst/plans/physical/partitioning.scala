@@ -261,6 +261,29 @@ case class RangePartitioning(ordering: Seq[SortOrder], numPartitions: Int)
   }
 }
 
+case class FixedRangePartitioning(ordering: SortOrder, numPartitions: Int, minValue: Long, maxValue: Long)
+  extends Expression with Partitioning with Unevaluable {
+
+  override def children: Seq[SortOrder] = Seq(ordering)
+  override def nullable: Boolean = false
+  override def dataType: DataType = IntegerType
+
+  override def satisfies(required: Distribution): Boolean = {
+    super.satisfies(required) || {
+      required match {
+        case OrderedDistribution(requiredOrdering) =>
+          requiredOrdering(0) == ordering
+        case ClusteredDistribution(requiredClustering, requiredNumPartitions) =>
+          children.map(_.child).forall(x => requiredClustering.exists(_.semanticEquals(x))) &&
+            (requiredNumPartitions.isEmpty || requiredNumPartitions.get == numPartitions)
+        case _ => false
+      }
+    }
+  }
+  private val bucketSize:Double = (maxValue - minValue).toDouble / numPartitions
+  def partitionIdExpression: Expression = Cast(Floor(Divide(Subtract(ordering.child, Literal(minValue)), Literal(bucketSize))), IntegerType)
+}
+
 /**
  * A collection of [[Partitioning]]s that can be used to describe the partitioning
  * scheme of the output of a physical operator. It is usually used for an operator

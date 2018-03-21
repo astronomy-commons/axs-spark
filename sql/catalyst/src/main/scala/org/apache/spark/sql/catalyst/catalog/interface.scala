@@ -151,6 +151,15 @@ case class CatalogTablePartition(
 }
 
 
+case class BucketingType private(name: String) {
+  override def toString: String = name
+}
+object BucketingType {
+  val HASH = new BucketingType("HASH")
+  val SEQUENTIAL = new BucketingType("SEQUENTIAL")
+}
+
+
 /**
  * A container for bucketing information.
  * Bucketing is a technology for decomposing data sets into more manageable parts, and the number
@@ -161,12 +170,25 @@ case class CatalogTablePartition(
  * @param sortColumnNames the names of the columns that used to sort data in each bucket.
  */
 case class BucketSpec(
-    numBuckets: Int,
-    bucketColumnNames: Seq[String],
-    sortColumnNames: Seq[String]) {
+                       numBuckets: Int,
+                       bucketColumnNames: Seq[String],
+                       sortColumnNames: Seq[String],
+                       bucketingType: BucketingType = BucketingType.HASH,
+                       minValue: Option[Long] = None,
+                       maxValue: Option[Long] = None) {
   if (numBuckets <= 0 || numBuckets >= 100000) {
     throw new AnalysisException(
       s"Number of buckets should be greater than 0 but less than 100000. Got `$numBuckets`")
+  }
+  if(bucketingType == BucketingType.SEQUENTIAL) {
+    if(minValue.isEmpty || maxValue.isEmpty) {
+      throw new AnalysisException(
+        s"Both minimum value and maximum value must be specified when using fixed range bucketing.")
+    }
+    if (minValue.get >= maxValue.get) {
+      throw new AnalysisException(
+        s"Minimum value for fixed range bucketing should be lesser than maximum value. Got `$minValue` and `$maxValue`")
+    }
   }
 
   override def toString: String = {
@@ -176,16 +198,40 @@ case class BucketSpec(
     } else {
       ""
     }
-    s"$numBuckets buckets, $bucketString$sortString"
+    val typeString = s", bucketing type: ${bucketingType.name}"
+    val minValString = if(minValue.isDefined) {
+      s", minValue: ${minValue.get}"
+    } else {
+      ""
+    }
+    val maxValString = if(maxValue.isDefined) {
+      s", maxValue: ${maxValue.get}"
+    } else {
+      ""
+    }
+    s"$numBuckets buckets, $bucketString$sortString$typeString$minValString$maxValString"
   }
 
   def toLinkedHashMap: mutable.LinkedHashMap[String, String] = {
     mutable.LinkedHashMap[String, String](
       "Num Buckets" -> numBuckets.toString,
       "Bucket Columns" -> bucketColumnNames.map(quoteIdentifier).mkString("[", ", ", "]"),
-      "Sort Columns" -> sortColumnNames.map(quoteIdentifier).mkString("[", ", ", "]")
+      "Sort Columns" -> sortColumnNames.map(quoteIdentifier).mkString("[", ", ", "]"),
+      "Bucketing Type" -> bucketingType.toString
     )
   }
+}
+object BucketSpec {
+  def apply(numBuckets: Int,
+      bucketColumnNames: Seq[String],
+      sortColumnNames: Seq[String]) : BucketSpec =
+        new BucketSpec(numBuckets, bucketColumnNames, sortColumnNames, BucketingType.HASH, None, None)
+  val BUCKET_TYPE_OPTION = "bucketingType"
+  val BUCKET_MIN_VALUE_OPTION = "bucketingMinValue"
+  val BUCKET_MAX_VALUE_OPTION = "bucketingMaxValue"
+  val NUM_BUCKETS_OPTION = "numBuckets"
+  val BUCKETING_COL_OPTION = "bucketingColumn"
+  val SORT_COLS_OPTION = "sortColumns"
 }
 
 /**

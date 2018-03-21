@@ -26,13 +26,13 @@ import org.apache.spark.serializer.Serializer
 import org.apache.spark.shuffle.sort.SortShuffleManager
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.errors._
-import org.apache.spark.sql.catalyst.expressions.{Attribute, UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Cast, UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.LazilyGeneratedOrdering
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{IntegerType, LongType, StructType}
 import org.apache.spark.util.MutablePair
 import org.apache.spark.util.collection.unsafe.sort.{PrefixComparators, RecordComparator}
 
@@ -227,6 +227,12 @@ object ShuffleExchangeExec {
           rddForSampling,
           ascending = true,
           samplePointsPerPartitionHint = SQLConf.get.rangeExchangeSampleSizePerPartition)
+      case FixedRangePartitioning(sortingExpression, numPartitions, minValue, maxValue) =>
+        new FixedRangePartitioner(
+          numPartitions,
+          minValue,
+          maxValue,
+          ascending = true)
       case SinglePartition =>
         new Partitioner {
           override def numPartitions: Int = 1
@@ -248,6 +254,9 @@ object ShuffleExchangeExec {
         val projection = UnsafeProjection.create(h.partitionIdExpression :: Nil, outputAttributes)
         row => projection(row).getInt(0)
       case RangePartitioning(_, _) | SinglePartition => identity
+      case f: FixedRangePartitioning =>
+        val projection = UnsafeProjection.create(Cast(f.ordering.child, IntegerType) :: Nil, outputAttributes)
+        row => projection(row).getInt(0)
       case _ => sys.error(s"Exchange not implemented for $newPartitioning")
     }
 

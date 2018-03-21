@@ -603,6 +603,8 @@ object CollapseRepartition extends Rule[LogicalPlan] {
     //   enables the shuffle. Returns the child node if the last numPartitions is bigger;
     //   otherwise, keep unchanged.
     // 2) In the other cases, returns the top node with the child's child
+    case r @ Repartition(_, _, child: FixedRangeRepartitionByExpression) => r
+    case r @ FixedRangeRepartitionByExpression(_, _, _, _, _) => r
     case r @ Repartition(_, _, child: RepartitionOperation) => (r.shuffle, child.shuffle) match {
       case (false, true) => if (r.numPartitions >= child.numPartitions) child else r
       case _ => r.copy(child = child.child)
@@ -906,6 +908,7 @@ object PushDownPredicate extends Rule[LogicalPlan] with PredicateHelper {
     case _: Generate => true
     case _: Pivot => true
     case _: RepartitionByExpression => true
+    case _: FixedRangeRepartitionByExpression => true
     case _: Repartition => true
     case _: ScriptTransformation => true
     case _: Sort => true

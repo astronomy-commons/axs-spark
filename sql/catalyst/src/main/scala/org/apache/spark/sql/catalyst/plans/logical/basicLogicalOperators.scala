@@ -22,8 +22,7 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogStorageFormat, CatalogTable
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.plans._
-import org.apache.spark.sql.catalyst.plans.physical.{HashPartitioning, Partitioning,
-  RangePartitioning, RoundRobinPartitioning}
+import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.types._
 import org.apache.spark.util.Utils
 import org.apache.spark.util.random.RandomSampler
@@ -864,6 +863,22 @@ case class RepartitionByExpression(
       RoundRobinPartitioning(numPartitions)
     }
   }
+
+  override def maxRows: Option[Long] = child.maxRows
+  override def shuffle: Boolean = true
+}
+
+case class FixedRangeRepartitionByExpression(
+    partitionExpression: Expression,
+    child: LogicalPlan,
+    numPartitions: Int,
+    minValue: Long,
+    maxValue: Long) extends RepartitionOperation {
+
+  require(numPartitions > 0, s"Number of partitions ($numPartitions) must be positive.")
+
+  val partitioning: Partitioning =
+      FixedRangePartitioning(partitionExpression.asInstanceOf[SortOrder], numPartitions, minValue, maxValue)
 
   override def maxRows: Option[Long] = child.maxRows
   override def shuffle: Boolean = true
