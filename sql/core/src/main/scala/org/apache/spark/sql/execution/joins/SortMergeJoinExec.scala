@@ -930,7 +930,7 @@ private[joins] class SortMergeJoinInnerRangeScanner(
 
   override def getStreamedRow: InternalRow = streamedRow
 
-  def getBufferedMatches: InMemoryUnsafeRowQueue = bufferedMatches
+  override def getBufferedMatches: InMemoryUnsafeRowQueue = bufferedMatches
 
   /**
     * Advances both input iterators, stopping when we have found rows with matching join keys.
