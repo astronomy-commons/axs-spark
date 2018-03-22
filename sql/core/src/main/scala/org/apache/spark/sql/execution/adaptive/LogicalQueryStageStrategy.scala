@@ -43,7 +43,7 @@ object LogicalQueryStageStrategy extends Strategy with PredicateHelper {
   }
 
   def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
-    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right, hint)
+    case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, _, condition, left, right, hint)
         if isBroadcastStage(left) || isBroadcastStage(right) =>
       val buildSide = if (isBroadcastStage(left)) BuildLeft else BuildRight
       Seq(BroadcastHashJoinExec(

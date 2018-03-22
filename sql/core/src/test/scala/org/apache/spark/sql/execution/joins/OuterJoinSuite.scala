@@ -79,7 +79,9 @@ class OuterJoinSuite extends SparkPlanTest with SharedSparkSession {
 
     if (joinType != FullOuter) {
       test(s"$testName using ShuffledHashJoin") {
-        extractJoinParts().foreach { case (_, leftKeys, rightKeys, boundCondition, _, _, _) =>
+        extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
+            boundCondition, _, _, _) =>
+          assert(rangeConditions.isEmpty)
           withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
             val buildSide = if (joinType == LeftOuter) BuildRight else BuildLeft
             checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
@@ -100,7 +102,9 @@ class OuterJoinSuite extends SparkPlanTest with SharedSparkSession {
           case RightOuter => BuildLeft
           case _ => fail(s"Unsupported join type $joinType")
         }
-        extractJoinParts().foreach { case (_, leftKeys, rightKeys, boundCondition, _, _, _) =>
+        extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
+            boundCondition, _, _, _) =>
+          assert(rangeConditions.isEmpty)
           withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
             checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
               BroadcastHashJoinExec(
@@ -113,11 +117,13 @@ class OuterJoinSuite extends SparkPlanTest with SharedSparkSession {
     }
 
     test(s"$testName using SortMergeJoin") {
-      extractJoinParts().foreach { case (_, leftKeys, rightKeys, boundCondition, _, _, _) =>
+      extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
+          boundCondition, _, _, _) =>
+        assert(rangeConditions.isEmpty)
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
           checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
             EnsureRequirements(spark.sessionState.conf).apply(
-              SortMergeJoinExec(leftKeys, rightKeys, joinType, boundCondition, left, right)),
+              SortMergeJoinExec(leftKeys, rightKeys, joinType, Nil, boundCondition, left, right)),
             expectedAnswer.map(Row.fromTuple),
             sortAnswers = true)
         }

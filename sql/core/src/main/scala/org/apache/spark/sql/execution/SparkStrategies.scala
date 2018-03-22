@@ -242,7 +242,10 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
       //   4. Pick cartesian product if join type is inner like.
       //   5. Pick broadcast nested loop join as the final solution. It may OOM but we don't have
       //      other choice.
-      case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right, hint) =>
+      case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys,
+                               rangeConds, condition, left, right, hint) =>
+        val mergedConditions = (rangeConds ++
+            condition.map(x => Seq(x)).getOrElse(Nil)).reduceOption(And)
         def createBroadcastHashJoin(buildLeft: Boolean, buildRight: Boolean) = {
           val wantToBuildLeft = canBuildLeft(joinType) && buildLeft
           val wantToBuildRight = canBuildRight(joinType) && buildRight
@@ -252,7 +255,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
               rightKeys,
               joinType,
               buildSide,
-              condition,
+              mergedConditions,
               planLater(left),
               planLater(right)))
           }
@@ -267,7 +270,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
               rightKeys,
               joinType,
               buildSide,
-              condition,
+              mergedConditions,
               planLater(left),
               planLater(right)))
           }
@@ -276,7 +279,8 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
         def createSortMergeJoin() = {
           if (RowOrdering.isOrderable(leftKeys)) {
             Some(Seq(joins.SortMergeJoinExec(
-              leftKeys, rightKeys, joinType, condition, planLater(left), planLater(right))))
+              leftKeys, rightKeys, joinType, rangeConds, condition,
+              planLater(left), planLater(right))))
           } else {
             None
           }
@@ -284,7 +288,8 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
         def createCartesianProduct() = {
           if (joinType.isInstanceOf[InnerLike]) {
-            Some(Seq(joins.CartesianProductExec(planLater(left), planLater(right), condition)))
+            Some(Seq(joins.CartesianProductExec(
+              planLater(left), planLater(right), mergedConditions)))
           } else {
             None
           }
@@ -309,7 +314,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
               // This join could be very slow or OOM
               val buildSide = getSmallerSide(left, right)
               Seq(joins.BroadcastNestedLoopJoinExec(
-                planLater(left), planLater(right), buildSide, joinType, condition))
+                planLater(left), planLater(right), buildSide, joinType, mergedConditions))
             }
         }
 
@@ -471,11 +476,14 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
   object StreamingJoinStrategy extends Strategy {
     override def apply(plan: LogicalPlan): Seq[SparkPlan] = {
       plan match {
-        case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys, condition, left, right, _)
+        case ExtractEquiJoinKeys(joinType, leftKeys, rightKeys,
+                                 rangePreds, condition, left, right, _)
           if left.isStreaming && right.isStreaming =>
 
           new StreamingSymmetricHashJoinExec(
-            leftKeys, rightKeys, joinType, condition, planLater(left), planLater(right)) :: Nil
+            leftKeys, rightKeys, joinType,
+            (rangePreds ++ condition.map(x => Seq(x)).getOrElse(Nil)).reduceOption(And),
+            planLater(left), planLater(right)) :: Nil
 
         case Join(left, right, _, _, _) if left.isStreaming && right.isStreaming =>
           throw new AnalysisException(
