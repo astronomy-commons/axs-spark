@@ -469,6 +469,7 @@ class PlannerSuite extends SharedSQLContext {
       Literal(1) :: Nil,
       Literal(1) :: Nil,
       Inner,
+      Nil,
       None,
       shuffle,
       shuffle)
@@ -486,6 +487,7 @@ class PlannerSuite extends SharedSQLContext {
       Literal(1) :: Nil,
       Literal(1) :: Nil,
       Inner,
+      Nil,
       None,
       ShuffleExchangeExec(finalPartitioning, inputPlan),
       ShuffleExchangeExec(finalPartitioning, inputPlan))
@@ -542,7 +544,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements skips sort when either side of join keys is required after inner SMJ") {
     Seq(Inner, Cross).foreach { joinType =>
-      val innerSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, None, planA, planB)
+      val innerSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, Nil,
+        None, planA, planB)
       // Both left and right keys should be sorted after the SMJ.
       Seq(orderingA, orderingB).foreach { ordering =>
         assertSortRequirementsAreSatisfied(
@@ -556,8 +559,10 @@ class PlannerSuite extends SharedSQLContext {
   test("EnsureRequirements skips sort when key order of a parent SMJ is propagated from its " +
     "child SMJ") {
     Seq(Inner, Cross).foreach { joinType =>
-      val childSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, None, planA, planB)
-      val parentSmj = SortMergeJoinExec(exprB :: Nil, exprC :: Nil, joinType, None, childSmj, planC)
+      val childSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, Nil,
+        None, planA, planB)
+      val parentSmj = SortMergeJoinExec(exprB :: Nil, exprC :: Nil, joinType, Nil,
+        None, childSmj, planC)
       // After the second SMJ, exprA, exprB and exprC should all be sorted.
       Seq(orderingA, orderingB, orderingC).foreach { ordering =>
         assertSortRequirementsAreSatisfied(
@@ -570,7 +575,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements for sort operator after left outer sort merge join") {
     // Only left key is sorted after left outer SMJ (thus doesn't need a sort).
-    val leftSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, LeftOuter, None, planA, planB)
+    val leftSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, LeftOuter, Nil,
+      None, planA, planB)
     Seq((orderingA, false), (orderingB, true)).foreach { case (ordering, needSort) =>
       assertSortRequirementsAreSatisfied(
         childPlan = leftSmj,
@@ -581,7 +587,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements for sort operator after right outer sort merge join") {
     // Only right key is sorted after right outer SMJ (thus doesn't need a sort).
-    val rightSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, RightOuter, None, planA, planB)
+    val rightSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, RightOuter, Nil,
+      None, planA, planB)
     Seq((orderingA, true), (orderingB, false)).foreach { case (ordering, needSort) =>
       assertSortRequirementsAreSatisfied(
         childPlan = rightSmj,
@@ -592,7 +599,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements adds sort after full outer sort merge join") {
     // Neither keys is sorted after full outer SMJ, so they both need sorts.
-    val fullSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, FullOuter, None, planA, planB)
+    val fullSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, FullOuter, Nil,
+      None, planA, planB)
     Seq(orderingA, orderingB).foreach { ordering =>
       assertSortRequirementsAreSatisfied(
         childPlan = fullSmj,
@@ -686,11 +694,11 @@ class PlannerSuite extends SharedSQLContext {
     val plan2 = DummySparkPlan(outputOrdering = Seq(orderingB),
       outputPartitioning = HashPartitioning(exprB :: Nil, 5))
     val smjExec = SortMergeJoinExec(
-      exprA :: exprA :: Nil, exprB :: exprC :: Nil, Inner, None, plan1, plan2)
+      exprA :: exprA :: Nil, exprB :: exprC :: Nil, Inner, Nil, None, plan1, plan2)
 
     val outputPlan = EnsureRequirements(spark.sessionState.conf).apply(smjExec)
     outputPlan match {
-      case SortMergeJoinExec(leftKeys, rightKeys, _, _, _, _) =>
+      case SortMergeJoinExec(leftKeys, rightKeys, _, _, _, _, _) =>
         assert(leftKeys == Seq(exprA, exprA))
         assert(rightKeys == Seq(exprB, exprC))
       case _ => fail()
