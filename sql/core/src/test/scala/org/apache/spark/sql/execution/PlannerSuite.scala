@@ -423,6 +423,7 @@ class PlannerSuite extends SharedSQLContext {
       Literal(1) :: Nil,
       Literal(1) :: Nil,
       Inner,
+      Nil,
       None,
       shuffle,
       shuffle)
@@ -440,6 +441,7 @@ class PlannerSuite extends SharedSQLContext {
       Literal(1) :: Nil,
       Literal(1) :: Nil,
       Inner,
+      Nil,
       None,
       ShuffleExchangeExec(finalPartitioning, inputPlan),
       ShuffleExchangeExec(finalPartitioning, inputPlan))
@@ -496,7 +498,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements skips sort when either side of join keys is required after inner SMJ") {
     Seq(Inner, Cross).foreach { joinType =>
-      val innerSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, None, planA, planB)
+      val innerSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, Nil,
+        None, planA, planB)
       // Both left and right keys should be sorted after the SMJ.
       Seq(orderingA, orderingB).foreach { ordering =>
         assertSortRequirementsAreSatisfied(
@@ -510,8 +513,10 @@ class PlannerSuite extends SharedSQLContext {
   test("EnsureRequirements skips sort when key order of a parent SMJ is propagated from its " +
     "child SMJ") {
     Seq(Inner, Cross).foreach { joinType =>
-      val childSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, None, planA, planB)
-      val parentSmj = SortMergeJoinExec(exprB :: Nil, exprC :: Nil, joinType, None, childSmj, planC)
+      val childSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, joinType, Nil,
+        None, planA, planB)
+      val parentSmj = SortMergeJoinExec(exprB :: Nil, exprC :: Nil, joinType, Nil,
+        None, childSmj, planC)
       // After the second SMJ, exprA, exprB and exprC should all be sorted.
       Seq(orderingA, orderingB, orderingC).foreach { ordering =>
         assertSortRequirementsAreSatisfied(
@@ -524,7 +529,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements for sort operator after left outer sort merge join") {
     // Only left key is sorted after left outer SMJ (thus doesn't need a sort).
-    val leftSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, LeftOuter, None, planA, planB)
+    val leftSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, LeftOuter, Nil,
+      None, planA, planB)
     Seq((orderingA, false), (orderingB, true)).foreach { case (ordering, needSort) =>
       assertSortRequirementsAreSatisfied(
         childPlan = leftSmj,
@@ -535,7 +541,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements for sort operator after right outer sort merge join") {
     // Only right key is sorted after right outer SMJ (thus doesn't need a sort).
-    val rightSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, RightOuter, None, planA, planB)
+    val rightSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, RightOuter, Nil,
+      None, planA, planB)
     Seq((orderingA, true), (orderingB, false)).foreach { case (ordering, needSort) =>
       assertSortRequirementsAreSatisfied(
         childPlan = rightSmj,
@@ -546,7 +553,8 @@ class PlannerSuite extends SharedSQLContext {
 
   test("EnsureRequirements adds sort after full outer sort merge join") {
     // Neither keys is sorted after full outer SMJ, so they both need sorts.
-    val fullSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, FullOuter, None, planA, planB)
+    val fullSmj = SortMergeJoinExec(exprA :: Nil, exprB :: Nil, FullOuter, Nil,
+      None, planA, planB)
     Seq(orderingA, orderingB).foreach { ordering =>
       assertSortRequirementsAreSatisfied(
         childPlan = fullSmj,
@@ -607,6 +615,115 @@ class PlannerSuite extends SharedSQLContext {
       childPlan = DummySparkPlan(outputOrdering = Seq(orderingA)),
       requiredOrdering = Seq(orderingA, orderingB),
       shouldHaveSort = true)
+  }
+
+  test("SPARK-24242: RangeExec should have correct output ordering and partitioning") {
+    val df = spark.range(10)
+    val rangeExec = df.queryExecution.executedPlan.collect {
+      case r: RangeExec => r
+    }
+    val range = df.queryExecution.optimizedPlan.collect {
+      case r: Range => r
+    }
+    assert(rangeExec.head.outputOrdering == range.head.outputOrdering)
+    assert(rangeExec.head.outputPartitioning ==
+      RangePartitioning(rangeExec.head.outputOrdering, df.rdd.getNumPartitions))
+
+    val rangeInOnePartition = spark.range(1, 10, 1, 1)
+    val rangeExecInOnePartition = rangeInOnePartition.queryExecution.executedPlan.collect {
+      case r: RangeExec => r
+    }
+    assert(rangeExecInOnePartition.head.outputPartitioning == SinglePartition)
+
+    val rangeInZeroPartition = spark.range(-10, -9, -20, 1)
+    val rangeExecInZeroPartition = rangeInZeroPartition.queryExecution.executedPlan.collect {
+      case r: RangeExec => r
+    }
+    assert(rangeExecInZeroPartition.head.outputPartitioning == UnknownPartitioning(0))
+  }
+
+  test("SPARK-24495: EnsureRequirements can return wrong plan when reusing the same key in join") {
+    val plan1 = DummySparkPlan(outputOrdering = Seq(orderingA),
+      outputPartitioning = HashPartitioning(exprA :: exprA :: Nil, 5))
+    val plan2 = DummySparkPlan(outputOrdering = Seq(orderingB),
+      outputPartitioning = HashPartitioning(exprB :: Nil, 5))
+    val smjExec = SortMergeJoinExec(
+      exprA :: exprA :: Nil, exprB :: exprC :: Nil, Inner, Nil, None, plan1, plan2)
+
+    val outputPlan = EnsureRequirements(spark.sessionState.conf).apply(smjExec)
+    outputPlan match {
+      case SortMergeJoinExec(leftKeys, rightKeys, _, _, _, _, _) =>
+        assert(leftKeys == Seq(exprA, exprA))
+        assert(rightKeys == Seq(exprB, exprC))
+      case _ => fail()
+    }
+  }
+
+  test("SPARK-24500: create union with stream of children") {
+    val df = Union(Stream(
+      Range(1, 1, 1, 1),
+      Range(1, 2, 1, 1)))
+    df.queryExecution.executedPlan.execute()
+  }
+
+  test("SPARK-24556: always rewrite output partitioning in ReusedExchangeExec " +
+    "and InMemoryTableScanExec") {
+    def checkOutputPartitioningRewrite(
+        plans: Seq[SparkPlan],
+        expectedPartitioningClass: Class[_]): Unit = {
+      assert(plans.size == 1)
+      val plan = plans.head
+      val partitioning = plan.outputPartitioning
+      assert(partitioning.getClass == expectedPartitioningClass)
+      val partitionedAttrs = partitioning.asInstanceOf[Expression].references
+      assert(partitionedAttrs.subsetOf(plan.outputSet))
+    }
+
+    def checkReusedExchangeOutputPartitioningRewrite(
+        df: DataFrame,
+        expectedPartitioningClass: Class[_]): Unit = {
+      val reusedExchange = df.queryExecution.executedPlan.collect {
+        case r: ReusedExchangeExec => r
+      }
+      checkOutputPartitioningRewrite(reusedExchange, expectedPartitioningClass)
+    }
+
+    def checkInMemoryTableScanOutputPartitioningRewrite(
+        df: DataFrame,
+        expectedPartitioningClass: Class[_]): Unit = {
+      val inMemoryScan = df.queryExecution.executedPlan.collect {
+        case m: InMemoryTableScanExec => m
+      }
+      checkOutputPartitioningRewrite(inMemoryScan, expectedPartitioningClass)
+    }
+
+    // ReusedExchange is HashPartitioning
+    val df1 = Seq(1 -> "a").toDF("i", "j").repartition($"i")
+    val df2 = Seq(1 -> "a").toDF("i", "j").repartition($"i")
+    checkReusedExchangeOutputPartitioningRewrite(df1.union(df2), classOf[HashPartitioning])
+
+    // ReusedExchange is RangePartitioning
+    val df3 = Seq(1 -> "a").toDF("i", "j").orderBy($"i")
+    val df4 = Seq(1 -> "a").toDF("i", "j").orderBy($"i")
+    checkReusedExchangeOutputPartitioningRewrite(df3.union(df4), classOf[RangePartitioning])
+
+    // InMemoryTableScan is HashPartitioning
+    Seq(1 -> "a").toDF("i", "j").repartition($"i").persist()
+    checkInMemoryTableScanOutputPartitioningRewrite(
+      Seq(1 -> "a").toDF("i", "j").repartition($"i"), classOf[HashPartitioning])
+
+    // InMemoryTableScan is RangePartitioning
+    spark.range(1, 100, 1, 10).toDF().persist()
+    checkInMemoryTableScanOutputPartitioningRewrite(
+      spark.range(1, 100, 1, 10).toDF(), classOf[RangePartitioning])
+
+    // InMemoryTableScan is PartitioningCollection
+    withSQLConf(SQLConf.AUTO_BROADCASTJOIN_THRESHOLD.key -> "-1") {
+      Seq(1 -> "a").toDF("i", "j").join(Seq(1 -> "a").toDF("m", "n"), $"i" === $"m").persist()
+      checkInMemoryTableScanOutputPartitioningRewrite(
+        Seq(1 -> "a").toDF("i", "j").join(Seq(1 -> "a").toDF("m", "n"), $"i" === $"m"),
+        classOf[PartitioningCollection])
+    }
   }
 }
 

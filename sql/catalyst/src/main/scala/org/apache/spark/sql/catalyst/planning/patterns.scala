@@ -17,11 +17,14 @@
 
 package org.apache.spark.sql.catalyst.planning
 
+import scala.collection.mutable
+
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.AggregateExpression
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.internal.SQLConf
 
 /**
  * A pattern that matches any number of project or filter operations on top of another relational
@@ -97,9 +100,10 @@ object PhysicalOperation extends PredicateHelper {
  * value).
  */
 object ExtractEquiJoinKeys extends Logging with PredicateHelper {
-  /** (joinType, leftKeys, rightKeys, condition, leftChild, rightChild) */
+  /** (joinType, leftKeys, rightKeys, rangeConditions, condition, leftChild, rightChild) */
   type ReturnType =
-    (JoinType, Seq[Expression], Seq[Expression], Option[Expression], LogicalPlan, LogicalPlan)
+    (JoinType, Seq[Expression], Seq[Expression], Seq[BinaryComparison],
+      Option[Expression], LogicalPlan, LogicalPlan)
 
   def unapply(plan: LogicalPlan): Option[ReturnType] = plan match {
     case join @ Join(left, right, joinType, condition) =>
@@ -131,12 +135,96 @@ object ExtractEquiJoinKeys extends Logging with PredicateHelper {
 
       if (joinKeys.nonEmpty) {
         val (leftKeys, rightKeys) = joinKeys.unzip
-        logDebug(s"leftKeys:$leftKeys | rightKeys:$rightKeys")
-        Some((joinType, leftKeys, rightKeys, otherPredicates.reduceOption(And), left, right))
+        // Find any simple range expressions between two columns
+        // (and involving only those two columns) of the two tables being joined,
+        // which are not used in the equijoin expressions,
+        // and which can be used for secondary sort optimizations.
+        // rangePreds will contain the original expressions to be filtered out later.
+        val rangePreds = mutable.Set.empty[Expression]
+        var rangeConditions: Seq[BinaryComparison] =
+          if (SQLConf.get.useSmjInnerRangeOptimization) {
+            otherPredicates.flatMap {
+              case p@LessThan(l, r) => checkRangeConditions(l, r, left, right, joinKeys).map {
+                case true => rangePreds.add(p); GreaterThan(r, l)
+                case false => rangePreds.add(p); p
+              }
+              case p@LessThanOrEqual(l, r) =>
+                checkRangeConditions(l, r, left, right, joinKeys).map {
+                  case true => rangePreds.add(p); GreaterThanOrEqual(r, l)
+                  case false => rangePreds.add(p); p
+                }
+              case p@GreaterThan(l, r) => checkRangeConditions(l, r, left, right, joinKeys).map {
+                case true => rangePreds.add(p); LessThan(r, l)
+                case false => rangePreds.add(p); p
+              }
+              case p@GreaterThanOrEqual(l, r) =>
+                checkRangeConditions(l, r, left, right, joinKeys).map {
+                  case true => rangePreds.add(p); LessThanOrEqual(r, l)
+                  case false => rangePreds.add(p); p
+                }
+              case _ => None
+            }
+          } else {
+            Nil
+          }
+
+        // Only using secondary join optimization when both lower and upper conditions
+        // are specified (e.g. t1.a < t2.b + x and t1.a > t2.b - x)
+        if (rangeConditions.size != 2 ||
+            // Looking for one < and one > comparison:
+            rangeConditions.forall(x => !x.isInstanceOf[LessThan] &&
+              !x.isInstanceOf[LessThanOrEqual]) ||
+            rangeConditions.forall(x => !x.isInstanceOf[GreaterThan] &&
+              !x.isInstanceOf[GreaterThanOrEqual]) ||
+            // Check if both comparisons reference the same columns:
+            rangeConditions.flatMap(c => c.left.references.toSeq.distinct).distinct.size != 1 ||
+            rangeConditions.flatMap(c => c.right.references.toSeq.distinct).distinct.size != 1) {
+          logDebug("Inner range optimization conditions not met. Clearing range conditions")
+          rangeConditions = Nil
+          rangePreds.clear()
+        }
+
+        Some((joinType, leftKeys, rightKeys, rangeConditions,
+          otherPredicates.filterNot(rangePreds.contains(_)).reduceOption(And), left, right))
       } else {
         None
       }
     case _ => None
+  }
+
+  /**
+   * Checks if l and r are valid range conditions:
+   *   - l and r expressions should both contain a single reference to one and the same column
+   *   - the referenced column should not be part of joinKeys
+   * If these conditions are not met, the function returns None.
+   *
+   * Otherwise, the function checks if the left plan contains l expression and the right plan
+   * contains r expression. If the expressions need to be switched, the function returns Some(true)
+   * and Some(false) otherwise.
+   */
+  private def checkRangeConditions(l : Expression, r : Expression,
+      left : LogicalPlan, right : LogicalPlan,
+      joinKeys : Seq[(Expression, Expression)]): Option[Boolean] = {
+    val (lattrs, rattrs) = (l.references.toSeq, r.references.toSeq)
+    if (lattrs.size != 1 || rattrs.size != 1) {
+      None
+    } else if (canEvaluate(l, left) && canEvaluate(r, right)) {
+      if (joinKeys.exists { case (ljk : Expression, rjk : Expression) =>
+          ljk.references.toSeq.contains(lattrs(0)) && rjk.references.toSeq.contains(rattrs(0)) }) {
+        None
+      } else {
+        Some(false)
+      }
+    } else if (canEvaluate(l, right) && canEvaluate(r, left)) {
+      if (joinKeys.exists{ case (ljk : Expression, rjk : Expression) =>
+        rjk.references.toSeq.contains(lattrs(0)) && ljk.references.toSeq.contains(rattrs(0)) }) {
+        None
+      } else {
+        Some(true)
+      }
+    } else {
+      None
+    }
   }
 }
 
