@@ -423,7 +423,6 @@ private[spark] class HiveExternalCatalog(conf: SparkConf, hadoopConf: Configurat
       val BucketSpec(numBuckets, bucketColumnNames, sortColumnNames, bucketingType, _, _) = bucketSpec.get
 
       properties.put(DATASOURCE_SCHEMA_NUMBUCKETS, numBuckets.toString)
-      properties.put(DATASOURCE_SCHEMA_BUCKETINGTYPE, bucketingType.toString)
       properties.put(DATASOURCE_SCHEMA_NUMBUCKETCOLS, bucketColumnNames.length.toString)
       bucketColumnNames.zipWithIndex.foreach { case (bucketCol, index) =>
         properties.put(s"$DATASOURCE_SCHEMA_BUCKETCOL_PREFIX$index", bucketCol)
@@ -1274,7 +1273,6 @@ object HiveExternalCatalog {
   val DATASOURCE_SCHEMA_NUMSORTCOLS = DATASOURCE_SCHEMA_PREFIX + "numSortCols"
   val DATASOURCE_SCHEMA_NUMBUCKETS = DATASOURCE_SCHEMA_PREFIX + "numBuckets"
   val DATASOURCE_SCHEMA_NUMBUCKETCOLS = DATASOURCE_SCHEMA_PREFIX + "numBucketCols"
-  val DATASOURCE_SCHEMA_BUCKETINGTYPE = DATASOURCE_SCHEMA_PREFIX + "bucketingType"
   val DATASOURCE_SCHEMA_PART_PREFIX = DATASOURCE_SCHEMA_PREFIX + "part."
   val DATASOURCE_SCHEMA_PARTCOL_PREFIX = DATASOURCE_SCHEMA_PREFIX + "partCol."
   val DATASOURCE_SCHEMA_BUCKETCOL_PREFIX = DATASOURCE_SCHEMA_PREFIX + "bucketCol."
