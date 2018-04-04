@@ -417,7 +417,7 @@ case class DataSource(
                 options(BucketSpec.SORT_COLS_OPTION).split(",").toSeq, BucketingType.SEQUENTIAL,
                 Some(options(BucketSpec.BUCKET_MIN_VALUE_OPTION).toLong), Some(options(BucketSpec.BUCKET_MAX_VALUE_OPTION).toLong)))
             else
-              None
+              bucketSpec
 
         HadoopFsRelation(
           fileCatalog,
