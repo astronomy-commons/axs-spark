@@ -41,7 +41,8 @@ case class SortMergeJoinExec(
     left: SparkPlan,
     right: SparkPlan) extends BinaryExecNode with PredicateHelper with CodegenSupport {
 
-  logDebug(s"SortMergeJoinExec args: leftKeys: $leftKeys, rightKeys: $rightKeys, joinType: $joinType," +
+  logDebug(s"SortMergeJoinExec args: leftKeys: $leftKeys, rightKeys: $rightKeys, " +
+    s"joinType: $joinType," +
     s" rangeConditions: $rangeConditions, " +
     s"condition: $condition, left: $left, right: $right")
 
@@ -52,13 +53,15 @@ case class SortMergeJoinExec(
 
   private val lowerSecondaryRangeExpression : Option[Expression] = {
     logDebug(s"Finding secondary greaterThan expressions in $rangeConditions")
-    val thefind = rangeConditions.find(p => p.isInstanceOf[GreaterThan] || p.isInstanceOf[GreaterThanOrEqual])
+    val thefind = rangeConditions.find(p =>
+      p.isInstanceOf[GreaterThan] || p.isInstanceOf[GreaterThanOrEqual])
     logDebug(s"Found secondary greaterThan expression: $thefind")
     thefind
   }
   private val upperSecondaryRangeExpression : Option[Expression] = {
     logDebug(s"Finding secondary lowerThan expressions in $rangeConditions")
-    val thefind = rangeConditions.find(p => p.isInstanceOf[LessThan] || p.isInstanceOf[LessThanOrEqual])
+    val thefind = rangeConditions.find(p =>
+      p.isInstanceOf[LessThan] || p.isInstanceOf[LessThanOrEqual])
     logDebug(s"Found secondary lowerThan expression: $thefind")
     thefind
   }
@@ -219,30 +222,32 @@ case class SortMergeJoinExec(
             private[this] var currentLeftRow: InternalRow = _
             private[this] var currentRightMatches: ExternalAppendOnlyUnsafeRowArray = _
             private[this] var rightMatchesIterator: Iterator[UnsafeRow] = null
-            private[this] val smjScanner = if(lowerSecondaryRangeExpression.isDefined || upperSecondaryRangeExpression.isDefined) {
-              new SortMergeJoinInnerRangeScanner(
-                createLeftKeyGenerator(),
-                createRightKeyGenerator(),
-                keyOrdering,
-                RowIterator.fromScala(leftIter),
-                RowIterator.fromScala(rightIter),
-                inMemoryThreshold,
-                spillThreshold,
-                lowerRangeCondition,
-                upperRangeCondition
-              )
-            }
-            else {
-              new SortMergeJoinScanner(
-                createLeftKeyGenerator(),
-                createRightKeyGenerator(),
-                keyOrdering,
-                RowIterator.fromScala(leftIter),
-                RowIterator.fromScala(rightIter),
-                inMemoryThreshold,
-                spillThreshold
-              )
-            }
+            private[this] val smjScanner =
+              if(lowerSecondaryRangeExpression.isDefined ||
+                  upperSecondaryRangeExpression.isDefined) {
+                new SortMergeJoinInnerRangeScanner(
+                  createLeftKeyGenerator(),
+                  createRightKeyGenerator(),
+                  keyOrdering,
+                  RowIterator.fromScala(leftIter),
+                  RowIterator.fromScala(rightIter),
+                  inMemoryThreshold,
+                  spillThreshold,
+                  lowerRangeCondition,
+                  upperRangeCondition
+                )
+              }
+              else {
+                new SortMergeJoinScanner(
+                  createLeftKeyGenerator(),
+                  createRightKeyGenerator(),
+                  keyOrdering,
+                  RowIterator.fromScala(leftIter),
+                  RowIterator.fromScala(rightIter),
+                  inMemoryThreshold,
+                  spillThreshold
+                )
+              }
             private[this] val joinRow = new JoinedRow
 
             if (smjScanner.findNextInnerJoinRows()) {
@@ -499,7 +504,8 @@ case class SortMergeJoinExec(
     // Inline mutable state since not many join operations in a task
     val leftRow = ctx.addMutableState("InternalRow", "leftRow", forceInline = true)
     val rightRow = ctx.addMutableState("InternalRow", "rightRow", forceInline = true)
-    val rightTmpRow = if(useSecondaryRange) ctx.addMutableState("InternalRow", "rightTmpRow", forceInline = true)
+    val rightTmpRow = if (useSecondaryRange)
+        ctx.addMutableState("InternalRow", "rightTmpRow", forceInline = true)
       else ""
 
     // Create variables for join keys from both sides.
@@ -524,25 +530,31 @@ case class SortMergeJoinExec(
 
     // Variables for secondary range expressions
     val (leftLowerKeyVars, leftUpperKeyVars, rightLowerKeyVars, rightUpperKeyVars) =
-      if(useSecondaryRange)
+      if (useSecondaryRange) {
         (createJoinKey(ctx, leftRow, leftLowerKeys, left.output),
           createJoinKey(ctx, leftRow, leftUpperKeys, left.output),
           createJoinKey(ctx, rightRow, rightLowerKeys, right.output),
           createJoinKey(ctx, rightRow, rightUpperKeys, right.output))
-      else (Nil, Nil, Nil, Nil)
+      }
+      else {
+        (Nil, Nil, Nil, Nil)
+      }
 
-    val secRangeDataType = if(leftLowerKeys.size > 0) leftLowerKeys(0).dataType
-      else if(leftUpperKeys.size > 0) leftUpperKeys(0).dataType
+    val secRangeDataType = if(leftLowerKeys.size > 0) { leftLowerKeys(0).dataType }
+      else if (leftUpperKeys.size > 0) { leftUpperKeys(0).dataType }
       else null
     val secRangeInitValue = CodeGenerator.defaultValue(secRangeDataType)
 
     val (leftLowerSecRangeKey, leftUpperSecRangeKey, rightLowerSecRangeKey, rightUpperSecRangeKey) =
-      if(useSecondaryRange)
+      if (useSecondaryRange) {
         (ctx.addBufferedState(secRangeDataType, "leftLowerSecRangeKey", secRangeInitValue),
           ctx.addBufferedState(secRangeDataType, "leftUpperSecRangeKey", secRangeInitValue),
           ctx.addBufferedState(secRangeDataType, "rightLowerSecRangeKey", secRangeInitValue),
           ctx.addBufferedState(secRangeDataType, "rightUpperSecRangeKey", secRangeInitValue))
-      else (null, null, null, null)
+      }
+      else {
+        (null, null, null, null)
+      }
 
     // A queue to hold all matched rows from right side.
     val clsName = if(useSecondaryRange) classOf[InMemoryUnsafeRowQueue].getName
@@ -565,23 +577,27 @@ case class SortMergeJoinExec(
       case LessThan(_, _) => ">="
       case _ => ""
     }.getOrElse("")
-    val lowerCompExp = if(lowerSecondaryRangeExpression.isEmpty) ""
-      else s" || (comp == 0 && ${leftLowerSecRangeKey.value} $lowerCompop ${rightLowerSecRangeKey.value})"
-    val upperCompExp = if(upperSecondaryRangeExpression.isEmpty) ""
-      else s" || (comp == 0 && ${leftUpperSecRangeKey.value} $upperCompop ${rightUpperSecRangeKey.value})"
+    val lowerCompExp = if (lowerSecondaryRangeExpression.isEmpty) ""
+      else s" || (comp == 0 && ${leftLowerSecRangeKey.value} " +
+        s"$lowerCompop ${rightLowerSecRangeKey.value})"
+    val upperCompExp = if (upperSecondaryRangeExpression.isEmpty) ""
+      else s" || (comp == 0 && ${leftUpperSecRangeKey.value} " +
+        s"$upperCompop ${rightUpperSecRangeKey.value})"
 
     logDebug(s"lowerCompExp: $lowerCompExp")
     logDebug(s"upperCompExp: $upperCompExp")
 
     // Add secondary range dequeue method
     if(useSecondaryRange) {
-      if (lowerSecondaryRangeExpression.isEmpty || rightLowerKeys.size == 0 || rightUpperKeys.size == 0) {
+      if (lowerSecondaryRangeExpression.isEmpty || rightLowerKeys.size == 0 ||
+          rightUpperKeys.size == 0) {
         ctx.addNewFunction("dequeueUntilLowerConditionHolds",
           "private void dequeueUntilLowerConditionHolds() { }",
           inlineToOuterClass = true)
       }
       else {
-        val rightRngTmpKeyVars = createJoinKey(ctx, rightTmpRow, rightUpperKeys.slice(0, 1), right.output)
+        val rightRngTmpKeyVars = createJoinKey(ctx, rightTmpRow,
+          rightUpperKeys.slice(0, 1), right.output)
         val rightRngTmpKeyVarsDecl = rightRngTmpKeyVars.map(_.code).mkString("\n")
         rightRngTmpKeyVars.foreach(_.code = "")
         val javaType = CodeGenerator.javaType(rightLowerKeys(0).dataType)
@@ -618,12 +634,16 @@ case class SortMergeJoinExec(
     val (rightLowVarsCode, rightUpperVarsCode) = if(useSecondaryRange)
       (rightLowerKeyVars.map(_.code).mkString("\n"), rightUpperKeyVars.map(_.code).mkString("\n"))
     else ("", "")
-    val (leftLowAssignCode, rightLowAssignCode) = if(leftLowerKeyVars.size > 0) lowerSecondaryRangeExpression.map(_ =>
-      (s"${leftLowerSecRangeKey.value} = ${leftLowerKeyVars(0).value};", s"${rightLowerSecRangeKey.value} = ${rightLowerKeyVars(0).value};")).
+    val (leftLowAssignCode, rightLowAssignCode) = if(leftLowerKeyVars.size > 0)
+        lowerSecondaryRangeExpression.map(_ =>
+      (s"${leftLowerSecRangeKey.value} = ${leftLowerKeyVars(0).value};",
+        s"${rightLowerSecRangeKey.value} = ${rightLowerKeyVars(0).value};")).
       getOrElse(("", ""))
       else ("", "")
-    val (leftUpperAssignCode, rightUpperAssignCode) = if(leftUpperKeyVars.size > 0) lowerSecondaryRangeExpression.map(_ =>
-      (s"${leftUpperSecRangeKey.value} = ${leftUpperKeyVars(0).value};", s"${rightUpperSecRangeKey.value} = ${rightUpperKeyVars(0).value};")).
+    val (leftUpperAssignCode, rightUpperAssignCode) = if(leftUpperKeyVars.size > 0)
+        lowerSecondaryRangeExpression.map(_ =>
+      (s"${leftUpperSecRangeKey.value} = ${leftUpperKeyVars(0).value};",
+        s"${rightUpperSecRangeKey.value} = ${rightUpperKeyVars(0).value};")).
       getOrElse(("", ""))
       else ("", "")
 
@@ -1079,7 +1099,7 @@ private[joins] class SortMergeJoinInnerRangeScanner(
   /** Buffered rows from the buffered side of the join. This is empty if there are no matches. */
 
   private[this] val bufferedMatches =
-    new InMemoryUnsafeRowQueue(inMemoryThreshold, spillThreshold)//ExternalAppendOnlyUnsafeRowArray(inMemoryThreshold, spillThreshold)
+    new InMemoryUnsafeRowQueue(inMemoryThreshold, spillThreshold)
 
   private[this] val joinRow = new JoinedRow
   // Initialization (note: do _not_ want to advance streamed here).
@@ -1108,10 +1128,12 @@ private[joins] class SortMergeJoinInnerRangeScanner(
       bufferedMatches.clear()
       false
     } else if (matchJoinKey != null && keyOrdering.compare(streamedRowKey, matchJoinKey) == 0) {
-      // The new streamed row has the same join key as the previous row, so the same matches can be used.
+      // The new streamed row has the same join key as the previous row,
+      // so the same matches can be used.
       // But lower and upper ranges might not hold anymore, so check them:
       //   First dequeue all rows from the queue until the lower range condition holds.
-      //   Then try to enqueue new rows with the same join key and for which the upper range condition holds.
+      //   Then try to enqueue new rows with the same join key and for which the upper
+      //   range condition holds.
       dequeueUntilLowerConditionHolds()
       bufferMatchingRows(true)
       true
@@ -1189,7 +1211,8 @@ private[joins] class SortMergeJoinInnerRangeScanner(
   }
 
   /**
-    * Advance the buffered iterator as long as the join key is the same and the lower range condition is not satisfied.
+    * Advance the buffered iterator as long as the join key is the same and
+    * the lower range condition is not satisfied.
     * Skip rows with nulls.
     * @return Result of the join key comparison.
     */
@@ -1201,8 +1224,9 @@ private[joins] class SortMergeJoinInnerRangeScanner(
     if(!lowCheck)
       while(!lowCheck && comp == 0 && advanceBufferedToRowWithNullFreeJoinKey()) {
         comp = keyOrdering.compare(streamedRowKey, bufferedRowKey)
-        if(comp == 0)
+        if(comp == 0) {
           lowCheck = lowerRangeCondition(joinRow(streamedRow, bufferedRow))
+        }
       }
     comp
   }
@@ -1218,8 +1242,9 @@ private[joins] class SortMergeJoinInnerRangeScanner(
     assert(keyOrdering.compare(streamedRowKey, bufferedRowKey) == 0)
     // This join key may have been produced by a mutable projection, so we need to make a copy:
     matchJoinKey = streamedRowKey.copy()
-    if(clear)
+    if (clear) {
       bufferedMatches.clear()
+    }
     var upperRangeOk = false
     var lowerRangeOk = false
     do {
@@ -1229,7 +1254,8 @@ private[joins] class SortMergeJoinInnerRangeScanner(
       if(lowerRangeOk && upperRangeOk)
         bufferedMatches.add(bufferedRow.asInstanceOf[UnsafeRow])
       advanceBufferedToRowWithNullFreeJoinKey()
-    } while (bufferedRow != null && keyOrdering.compare(streamedRowKey, bufferedRowKey) == 0 && upperRangeOk)
+    } while (bufferedRow != null && keyOrdering.compare(streamedRowKey, bufferedRowKey) == 0
+      && upperRangeOk)
   }
 
   private def dequeueUntilLowerConditionHolds(): Unit = {
