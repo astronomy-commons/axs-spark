@@ -18,15 +18,15 @@
 package org.apache.spark.sql.execution.joins
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, CodeGenerator, ExprCode}
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
+import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.util.collection.BitSet
 
 /**
@@ -46,11 +46,6 @@ case class SortMergeJoinExec(
     s" rangeConditions: $rangeConditions, " +
     s"condition: $condition, left: $left, right: $right")
 
-//  val leftBucketSpec = findBucketSpec(left)
-//  val rightBucketSpec = findBucketSpec(right)
-//
-//  logDebug(s"Found left bucket spec: $leftBucketSpec. Found right bucket spec: $rightBucketSpec")
-
   private val lowerSecondaryRangeExpression : Option[Expression] = {
     logDebug(s"Finding secondary greaterThan expressions in $rangeConditions")
     val thefind = rangeConditions.find(p =>
@@ -66,25 +61,23 @@ case class SortMergeJoinExec(
     thefind
   }
 
-  val useSecondaryRange = shouldUseSecondaryRangeJoin()
+  val useInnerRange = SQLConf.get.useSmjInnerRangeOptimization &&
+    (lowerSecondaryRangeExpression.isDefined || upperSecondaryRangeExpression.isDefined)
 
-  logDebug(s"Use secondary range join resolved to $useSecondaryRange.")
+  logDebug(s"Use secondary range join resolved to $useInnerRange.")
 
-  val lrKeys = rangeConditions.flatMap(c => c.left.references.toSeq.distinct).distinct
-  val rrKeys = rangeConditions.flatMap(c => c.right.references.toSeq.distinct).distinct
-
-//  private def findBucketSpec(plan: SparkPlan): Option[BucketSpec] = {
-//    if(plan.isInstanceOf[FileSourceScanExec]) {
-//      plan.asInstanceOf[FileSourceScanExec].relation.bucketSpec
-//    }
-//    else {
-//      val cb = plan.children.flatMap(c => findBucketSpec(c))
-//      if (cb.size > 0)
-//        Some(cb(0))
-//      else
-//        None
-//    }
-//  }
+  val lrKeys = if(useInnerRange) {
+      rangeConditions.flatMap(c => c.left.references.toSeq).distinct
+    }
+    else {
+      Nil
+    }
+  val rrKeys = if(useInnerRange) {
+      rangeConditions.flatMap(c => c.right.references.toSeq).distinct
+    }
+    else {
+      Nil
+    }
 
   override lazy val metrics = Map(
     "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
@@ -498,11 +491,6 @@ case class SortMergeJoinExec(
      """.stripMargin
   }
 
-  private def shouldUseSecondaryRangeJoin(): Boolean = {
-    // TODO check sorting of the two relations? - Check it during planning?
-    lowerSecondaryRangeExpression.isDefined || upperSecondaryRangeExpression.isDefined
-  }
-
   /**
    * Generate a function to scan both left and right to find a match, returns the term for
    * matched one row from left side and buffered rows from right side.
@@ -513,7 +501,7 @@ case class SortMergeJoinExec(
     // Inline mutable state since not many join operations in a task
     val leftRow = ctx.addMutableState("InternalRow", "leftRow", forceInline = true)
     val rightRow = ctx.addMutableState("InternalRow", "rightRow", forceInline = true)
-    val rightTmpRow = if (useSecondaryRange) {
+    val rightTmpRow = if (useInnerRange) {
         ctx.addMutableState("InternalRow", "rightTmpRow", forceInline = true)
       }
       else { "" }
@@ -540,7 +528,7 @@ case class SortMergeJoinExec(
 
     // Variables for secondary range expressions
     val (leftLowerKeyVars, leftUpperKeyVars, rightLowerKeyVars, rightUpperKeyVars) =
-      if (useSecondaryRange) {
+      if (useInnerRange) {
         (createJoinKey(ctx, leftRow, leftLowerKeys, left.output),
           createJoinKey(ctx, leftRow, leftUpperKeys, left.output),
           createJoinKey(ctx, rightRow, rightLowerKeys, right.output),
@@ -556,7 +544,7 @@ case class SortMergeJoinExec(
     val secRangeInitValue = CodeGenerator.defaultValue(secRangeDataType)
 
     val (leftLowerSecRangeKey, leftUpperSecRangeKey, rightLowerSecRangeKey, rightUpperSecRangeKey) =
-      if (useSecondaryRange) {
+      if (useInnerRange) {
         (ctx.addBufferedState(secRangeDataType, "leftLowerSecRangeKey", secRangeInitValue),
           ctx.addBufferedState(secRangeDataType, "leftUpperSecRangeKey", secRangeInitValue),
           ctx.addBufferedState(secRangeDataType, "rightLowerSecRangeKey", secRangeInitValue),
@@ -567,7 +555,7 @@ case class SortMergeJoinExec(
       }
 
     // A queue to hold all matched rows from right side.
-    val clsName = if (useSecondaryRange) classOf[InMemoryUnsafeRowQueue].getName
+    val clsName = if (useInnerRange) classOf[InMemoryUnsafeRowQueue].getName
       else classOf[ExternalAppendOnlyUnsafeRowArray].getName
 
     val spillThreshold = getSpillThreshold
@@ -598,7 +586,7 @@ case class SortMergeJoinExec(
     logDebug(s"upperCompExp: $upperCompExp")
 
     // Add secondary range dequeue method
-    if (!useSecondaryRange || lowerSecondaryRangeExpression.isEmpty ||
+    if (!useInnerRange || lowerSecondaryRangeExpression.isEmpty ||
         rightLowerKeys.size == 0 || rightUpperKeys.size == 0) {
       ctx.addNewFunction("dequeueUntilLowerConditionHolds",
         "private void dequeueUntilLowerConditionHolds() { }",
@@ -636,11 +624,11 @@ case class SortMergeJoinExec(
            |}
          """.stripMargin, inlineToOuterClass = true)
     }
-    val (leftLowVarsCode, leftUpperVarsCode) = if (useSecondaryRange) {
+    val (leftLowVarsCode, leftUpperVarsCode) = if (useInnerRange) {
         (leftLowerKeyVars.map(_.code).mkString("\n"), leftUpperKeyVars.map(_.code).mkString("\n"))
       }
       else { ("", "") }
-    val (rightLowVarsCode, rightUpperVarsCode) = if (useSecondaryRange) {
+    val (rightLowVarsCode, rightUpperVarsCode) = if (useInnerRange) {
         (rightLowerKeyVars.map(_.code).mkString("\n"), rightUpperKeyVars.map(_.code).mkString("\n"))
       }
       else { ("", "") }
