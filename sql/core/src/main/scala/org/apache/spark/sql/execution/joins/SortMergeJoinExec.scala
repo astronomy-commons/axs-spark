@@ -18,6 +18,7 @@
 package org.apache.spark.sql.execution.joins
 
 import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -67,13 +68,13 @@ case class SortMergeJoinExec(
 
   logDebug(s"Use secondary range join resolved to $useInnerRange.")
 
-  val lrKeys = if(useInnerRange) {
+  val lrKeys = if (useInnerRange) {
       rangeConditions.flatMap(c => c.left.references.toSeq).distinct
     }
     else {
       Nil
     }
-  val rrKeys = if(useInnerRange) {
+  val rrKeys = if (useInnerRange) {
       rangeConditions.flatMap(c => c.right.references.toSeq).distinct
     }
     else {
