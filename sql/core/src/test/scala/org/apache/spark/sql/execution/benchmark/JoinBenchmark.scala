@@ -222,6 +222,61 @@ class JoinBenchmark extends BenchmarkBase {
      */
   }
 
+  val expensiveFunc = (first: Int, second: Int) => {
+    for (i <- 1 to 2000) {
+      Math.sqrt(i * i * i)
+    }
+    Math.abs(first - second)
+  }
+
+  def innerRangeTest(N: Int, M: Int): Unit = {
+    import sparkSession.implicits._
+    val expUdf = sparkSession.udf.register("expensiveFunc", expensiveFunc)
+    val df1 = sparkSession.sparkContext.parallelize(1 to M).
+      cartesian(sparkSession.sparkContext.parallelize(1 to N)).
+      toDF("col1a", "col1b")
+    val df2 = sparkSession.sparkContext.parallelize(1 to M).
+      cartesian(sparkSession.sparkContext.parallelize(1 to N)).
+      toDF("col2a", "col2b")
+    val df = df1.join(df2, 'col1a === 'col2a and ('col1b < 'col2b + 3) and ('col1b > 'col2b - 3))
+    assert(df.queryExecution.sparkPlan.find(_.isInstanceOf[SortMergeJoinExec]).isDefined)
+    df.where(expUdf('col1b, 'col2b) < 3).count()
+  }
+
+  test("sort merge inner range join") {
+    sparkSession.conf.set("spark.sql.join.smj.useInnerRangeOptimization", "false")
+    val N = 2 << 5
+    val M = 100
+    runBenchmark("sort merge inner range join", N * M) {
+      innerRangeTest(N, M)
+    }
+
+    /*
+     *AMD EPYC 7401 24-Core Processor
+     *sort merge join:                      Best/Avg Time(ms)    Rate(M/s)   Per Row(ns)   Relative
+     *---------------------------------------------------------------------------------------------
+     *sort merge join wholestage off              7954 / 8004          0.0       38837.2       1.0X
+     *sort merge join wholestage on               2996 / 3352          0.1       14630.2       2.7X
+     */
+  }
+
+  test("sort merge inner range join optimized") {
+    sparkSession.conf.set("spark.sql.join.smj.useInnerRangeOptimization", "true")
+    val N = 2 << 5
+    val M = 100
+    runBenchmark("sort merge inner range join optimized", N * M) {
+      innerRangeTest(N, M)
+    }
+
+    /*
+     *AMD EPYC 7401 24-Core Processor
+     *sort merge join:                      Best/Avg Time(ms)    Rate(M/s)   Per Row(ns)   Relative
+     *---------------------------------------------------------------------------------------------
+     *sort merge join wholestage off            29829 / 29876          0.0      145647.1       1.0X
+     *sort merge join wholestage on                671 /  711          0.3        3274.3      44.5X
+     */
+  }
+
   ignore("shuffle hash join") {
     val N = 4 << 20
     sparkSession.conf.set("spark.sql.shuffle.partitions", "2")
