@@ -101,7 +101,7 @@ object PhysicalOperation extends PredicateHelper {
  * value).
  */
 object ExtractEquiJoinKeys extends Logging with PredicateHelper {
-  /** (joinType, leftKeys, rightKeys, condition, leftChild, rightChild) */
+  /** (joinType, leftKeys, rightKeys, rangeConditions, condition, leftChild, rightChild) */
   type ReturnType =
     (JoinType, Seq[Expression], Seq[Expression], Seq[BinaryComparison],
       Option[Expression], LogicalPlan, LogicalPlan)
@@ -186,6 +186,7 @@ object ExtractEquiJoinKeys extends Logging with PredicateHelper {
             // Check if both comparisons reference the same columns:
             rangeConditions.flatMap(c => c.left.references.toSeq.distinct).distinct.size != 1 ||
             rangeConditions.flatMap(c => c.right.references.toSeq.distinct).distinct.size != 1) {
+          logDebug("Inner range optimization conditions not met. Clearing range conditions")
           rangeConditions = Nil
           rangePreds.clear()
         }
