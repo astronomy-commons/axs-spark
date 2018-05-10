@@ -259,7 +259,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
 
     counter = 1
     configOptions.foreach { case (config, confValue) =>
-      test(s"$testName using CartesianProduct") {
+      test(s"$testName using CartesianProduct $counter") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1",
           SQLConf.CROSS_JOINS_ENABLED.key -> "true", config -> confValue) {
           checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
@@ -273,7 +273,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
 
     counter = 1
     configOptions.foreach { case (config, confValue) =>
-      test(s"$testName using BroadcastNestedLoopJoin build left") {
+      test(s"$testName using BroadcastNestedLoopJoin build left $counter") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1", config -> confValue) {
           checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
             BroadcastNestedLoopJoinExec(left, right, BuildLeft, Inner, Some(condition())),
