@@ -260,6 +260,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
       }
       counter += 1
     }
+    }
 
     counter = 1
     configOptions.foreach { case (config, confValue) => {
