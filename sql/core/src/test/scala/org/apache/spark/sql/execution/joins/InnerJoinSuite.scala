@@ -149,7 +149,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
     // Disabling these because the code would never follow this path in case of a inner range join
     if (!expectRangeJoin) {
       var counter = 1
-      configOptions.foreach { case (config, confValue) => {
+      configOptions.foreach { case (config, confValue) =>
         test(s"$testName using BroadcastHashJoin (build=left) $counter") {
           extractJoinParts().foreach { case (_, leftKeys, rightKeys, _,
           boundCondition, _, _) =>
@@ -164,12 +164,11 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
         }
         counter += 1
       }
-      }
     }
 
     if(!expectRangeJoin) {
       var counter = 1
-      configOptions.foreach { case (config, confValue) => {
+      configOptions.foreach { case (config, confValue) =>
         test(s"$testName using BroadcastHashJoin (build=right) $counter") {
           extractJoinParts().foreach { case (_, leftKeys, rightKeys, _,
           boundCondition, _, _) =>
@@ -184,12 +183,11 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
         }
         counter += 1
       }
-      }
     }
 
     if(!expectRangeJoin) {
       var counter = 1
-      configOptions.foreach { case (config, confValue) => {
+      configOptions.foreach { case (config, confValue) =>
         test(s"$testName using ShuffledHashJoin (build=left) $counter") {
           extractJoinParts().foreach { case (_, leftKeys, rightKeys, _,
           boundCondition, _, _) =>
@@ -204,12 +202,11 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
         }
         counter += 1
       }
-      }
     }
 
     if(!expectRangeJoin) {
       var counter = 1
-      configOptions.foreach { case (config, confValue) => {
+      configOptions.foreach { case (config, confValue) =>
         test(s"$testName using ShuffledHashJoin (build=right) $counter") {
           extractJoinParts().foreach { case (_, leftKeys, rightKeys, _,
           boundCondition, _, _) =>
@@ -224,11 +221,10 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
         }
         counter += 1
       }
-      }
     }
 
     var counter = 1
-    configOptions.foreach { case (config, confValue) => {
+    configOptions.foreach { case (config, confValue) =>
       test(s"$testName using SortMergeJoin $counter") {
         extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
         boundCondition, _, _) =>
@@ -260,10 +256,9 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
       }
       counter += 1
     }
-    }
 
     counter = 1
-    configOptions.foreach { case (config, confValue) => {
+    configOptions.foreach { case (config, confValue) =>
       test(s"$testName using CartesianProduct") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1",
           SQLConf.CROSS_JOINS_ENABLED.key -> "true", config -> confValue) {
@@ -275,10 +270,9 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
       }
       counter += 1
     }
-    }
 
     counter = 1
-    configOptions.foreach { case (config, confValue) => {
+    configOptions.foreach { case (config, confValue) =>
       test(s"$testName using BroadcastNestedLoopJoin build left") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1", config -> confValue) {
           checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
@@ -289,10 +283,9 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
       }
       counter += 1
     }
-    }
 
     counter = 1
-    configOptions.foreach { case (config, confValue) => {
+    configOptions.foreach { case (config, confValue) =>
       test(s"$testName using BroadcastNestedLoopJoin build right $counter") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1", config -> confValue) {
           checkAnswer2(leftRows, rightRows, (left: SparkPlan, right: SparkPlan) =>
@@ -302,7 +295,6 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
         }
       }
       counter += 1
-    }
     }
   }
 
