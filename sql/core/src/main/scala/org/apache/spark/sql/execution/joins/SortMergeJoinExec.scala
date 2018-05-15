@@ -586,8 +586,7 @@ case class SortMergeJoinExec(
     if (!useInnerRange || lowerSecondaryRangeExpression.isEmpty ||
         rightLowerKeys.size == 0 || rightUpperKeys.size == 0) {
       ctx.addNewFunction("dequeueUntilUpperConditionHolds",
-        "private void dequeueUntilUpperConditionHolds() { }",
-        inlineToOuterClass = true)
+        "private void dequeueUntilUpperConditionHolds() { }")
     }
     else {
       val rightRngTmpKeyVars = createJoinKey(ctx, rightTmpRow,
@@ -619,7 +618,7 @@ case class SortMergeJoinExec(
            |    tempVal = getRightTmpRangeValue();
            |  }
            |}
-         """.stripMargin, inlineToOuterClass = true)
+         """.stripMargin)
     }
     val (leftLowVarsCode, leftUpperVarsCode) = if (useInnerRange) {
         (leftLowerKeyVars.map(_.code).mkString("\n"), leftUpperKeyVars.map(_.code).mkString("\n"))
@@ -1072,15 +1071,15 @@ private[joins] class SortMergeJoinScanner(
  * @param spillThreshold Threshold for number of rows to be spilled by internal buffer
  */
 private[joins] class SortMergeJoinInnerRangeScanner(
-                                           streamedKeyGenerator: Projection,
-                                           bufferedKeyGenerator: Projection,
-                                           keyOrdering: Ordering[InternalRow],
-                                           streamedIter: RowIterator,
-                                           bufferedIter: RowIterator,
-                                           inMemoryThreshold: Int,
-                                           spillThreshold: Int,
-                                           lowerRangeCondition: InternalRow => Boolean,
-                                           upperRangeCondition: InternalRow => Boolean)
+      streamedKeyGenerator: Projection,
+      bufferedKeyGenerator: Projection,
+      keyOrdering: Ordering[InternalRow],
+      streamedIter: RowIterator,
+      bufferedIter: RowIterator,
+      inMemoryThreshold: Int,
+      spillThreshold: Int,
+      lowerRangeCondition: InternalRow => Boolean,
+      upperRangeCondition: InternalRow => Boolean)
     extends SortMergeJoinScanner(streamedKeyGenerator, bufferedKeyGenerator, keyOrdering,
       streamedIter, bufferedIter, inMemoryThreshold, spillThreshold) {
   private[this] var streamedRow: InternalRow = _
