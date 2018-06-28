@@ -298,6 +298,7 @@ case class EnsureRequirements(conf: SQLConf) extends Rule[SparkPlan] {
           reorderJoinKeys(leftKeys, rightKeys, left.outputPartitioning, right.outputPartitioning)
         SortMergeJoinExec(reorderedLeftKeys, reorderedRightKeys, joinType, rangeConditions,
           condition, left, right)
+
       case other => other
     }
   }
