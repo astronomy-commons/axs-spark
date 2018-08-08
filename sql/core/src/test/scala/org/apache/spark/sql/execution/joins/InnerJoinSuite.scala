@@ -229,7 +229,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
           withSQLConf(SQLConf.USE_SMJ_INNER_RANGE_OPTIMIZATION.key -> "false") {
             extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
             boundCondition, _, _) =>
-              assert(rangeConditions.size == 2)
+              assert(rangeConditions.isEmpty)
               withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
                 checkAnswer2(leftRows, rightRows, (leftPlan: SparkPlan, rightPlan: SparkPlan) =>
                   makeSortMergeJoin(leftKeys, rightKeys, boundCondition, rangeConditions,
