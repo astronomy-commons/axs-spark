@@ -773,17 +773,7 @@ class JoinSuite extends QueryTest with SharedSQLContext {
       )
       assertSpilled(sparkContext, "inner range join") {
         checkAnswer(
-          sql(
-            """
-              |SELECT
-              |  a, b, c, d
-              |FROM
-              |  testData4 left, testData5 right
-              |WHERE
-              |  left.a = right.c and (left.b <= right.d + 1)
-              |                   and (left.b >= right.d - 1)
-              |ORDER BY a,b,c,d
-            """.stripMargin),
+          testData4.join(testData5, ('a === 'c ) and ('b between('d - 1, 'd + 1))),
           expected2
         )
       }
