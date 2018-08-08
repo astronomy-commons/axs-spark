@@ -186,18 +186,18 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
       }
   }})
 
-  test("iterator on an empty array should be empty") {
-    asQueueVals.foreach(q => {
+  asQueueVals.foreach(q => {
+  test(s"iterator on an empty array should be empty $q") {
       withExternalArray(inMemoryThreshold = 4, spillThreshold = 10, q) { array =>
         val iterator = array.generateIterator()
         assert(array.isEmpty)
         assert(array.length == 0)
         assert(!iterator.hasNext)
-      }})
-  }
+      }
+  }})
 
-  test("generate iterator with negative start index") {
-    asQueueVals.foreach(q => {
+  asQueueVals.foreach(q => {
+  test(s"generate iterator with negative start index $q") {
       withExternalArray(inMemoryThreshold = 100, spillThreshold = 56, q) { array =>
         val exception =
           intercept[ArrayIndexOutOfBoundsException](array.generateIterator(startIndex = -10))
@@ -205,12 +205,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         assert(exception.getMessage.contains(
           "Invalid `startIndex` provided for generating iterator over the array")
         )
-      }})
-  }
+      }
+  }})
 
-  test("generate iterator with start index exceeding array's size (without spill)") {
+  asQueueVals.foreach(q => {
+  test(s"generate iterator with start index exceeding array's size (without spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (20, 100)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         populateRows(array, spillThreshold / 2)
 
@@ -219,12 +219,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
             array.generateIterator(startIndex = spillThreshold * 10))
         assert(exception.getMessage.contains(
           "Invalid `startIndex` provided for generating iterator over the array"))
-      }})
-  }
+      }
+  }})
 
-  test("generate iterator with start index exceeding array's size (with spill)") {
+  asQueueVals.foreach(q => {
+  test(s"generate iterator with start index exceeding array's size (with spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (20, 100)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         populateRows(array, spillThreshold * 2)
 
@@ -234,12 +234,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
 
         assert(exception.getMessage.contains(
           "Invalid `startIndex` provided for generating iterator over the array"))
-      }})
-  }
+      }
+  }})
 
-  test("generate iterator with custom start index (without spill)") {
+  asQueueVals.foreach(q => {
+  test(s"generate iterator with custom start index (without spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (20, 100)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         val expectedValues = populateRows(array, inMemoryThreshold)
         val startIndex = inMemoryThreshold / 2
@@ -247,12 +247,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         for (i <- startIndex until expectedValues.length) {
           checkIfValueExists(iterator, expectedValues(i))
         }
-      }})
-  }
+      }
+  }})
 
-  test("generate iterator with custom start index (with spill)") {
+  asQueueVals.foreach(q => {
+  test(s"generate iterator with custom start index (with spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (20, 100)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         val expectedValues = populateRows(array, spillThreshold * 10)
         val startIndex = spillThreshold * 2
@@ -260,11 +260,11 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         for (i <- startIndex until expectedValues.length) {
           checkIfValueExists(iterator, expectedValues(i))
         }
-      }})
-  }
+      }
+  }})
 
-  test("test iterator invalidation (without spill)") {
-    asQueueVals.foreach(q => {
+  asQueueVals.foreach(q => {
+  test(s"test iterator invalidation (without spill) $q") {
       withExternalArray(inMemoryThreshold = 10, spillThreshold = 100, q) { array =>
         // insert 2 rows, iterate until the first row
         populateRows(array, 2)
@@ -286,12 +286,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         array.clear()
         assert(!iterator.hasNext)
         intercept[ConcurrentModificationException](iterator.next())
-      }})
-  }
+      }
+  }})
 
-  test("test iterator invalidation (with spill)") {
+  asQueueVals.foreach(q => {
+  test(s"test iterator invalidation (with spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (2, 10)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         // Populate enough rows so that spill happens
         populateRows(array, spillThreshold * 2)
@@ -314,11 +314,11 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         array.clear()
         assert(!iterator.hasNext)
         intercept[ConcurrentModificationException](iterator.next())
-      }})
-  }
+      }
+  }})
 
-  test("clear on an empty the array") {
-    asQueueVals.foreach(q => {
+  asQueueVals.foreach(q => {
+  test(s"clear on an empty the array $q") {
       withExternalArray(inMemoryThreshold = 2, spillThreshold = 3, q) { array =>
         val iterator = array.generateIterator()
         assert(!iterator.hasNext)
@@ -333,12 +333,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         // Clearing an empty array should also invalidate any old iterators
         assert(!iterator.hasNext)
         intercept[ConcurrentModificationException](iterator.next())
-      }})
-  }
+      }
+  }})
 
-  test("clear array (without spill)") {
+  asQueueVals.foreach(q => {
+  test(s"clear array (without spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (10, 100)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         // Populate rows ... but not enough to trigger spill
         populateRows(array, inMemoryThreshold / 2)
@@ -359,12 +359,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         populateRows(array, inMemoryThreshold / 2, expectedValues)
         validateData(array, expectedValues)
         assertNoSpill()
-      }})
-  }
+      }
+  }})
 
-  test("clear array (with spill)") {
+  asQueueVals.foreach(q => {
+  test(s"clear array (with spill) $q") {
     val (inMemoryThreshold, spillThreshold) = (10, 20)
-    asQueueVals.foreach(q => {
     withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
       // Populate enough rows to trigger spill
       populateRows(array, spillThreshold * 2)
@@ -386,6 +386,6 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
       populateRows(array, spillThreshold * 2, expectedValues)
       validateData(array, expectedValues)
       assert(getNumBytesSpilled > bytesSpilled)
-    }})
-  }
+    }
+  }})
 }
