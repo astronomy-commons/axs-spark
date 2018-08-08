@@ -114,7 +114,7 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
   val asQueueVals = Array(false, true)
 
   asQueueVals.foreach(q => {
-  test("insert rows less than the inMemoryThreshold") {
+  test(s"insert rows less than the inMemoryThreshold $q") {
     val (inMemoryThreshold, spillThreshold) = (100, 50)
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
@@ -139,7 +139,7 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
   }})
 
   asQueueVals.foreach(q => {
-  test("insert rows more than the inMemoryThreshold but less than spillThreshold") {
+  test(s"insert rows more than the inMemoryThreshold but less than spillThreshold $q") {
     val (inMemoryThreshold, spillThreshold) = (10, 50)
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
@@ -163,7 +163,7 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
   }})
 
   asQueueVals.foreach(q => {
-  test("insert rows enough to force spill") {
+  test(s"insert rows enough to force spill $q") {
     val (inMemoryThreshold, spillThreshold) = (20, 10)
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
