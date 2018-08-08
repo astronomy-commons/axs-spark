@@ -141,9 +141,10 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
       None
     }
     else if (spillableArray != null) {
-      spillableArrayOffset += 1
+      val retval = Some(generateIterator().next)
       numRows -= 1
-      Some(generateIterator(spillableArrayOffset-1).next)
+      spillableArrayOffset += 1
+      retval
     }
     else {
       numRows -= 1
@@ -159,7 +160,7 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
       None
     }
     else if (spillableArray != null) {
-      Some(generateIterator(spillableArrayOffset).next)
+      Some(generateIterator().next)
     }
     else {
       Some(inMemoryQueue(0))
@@ -242,7 +243,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
         "Invalid `startIndex` provided for generating iterator over the array. " +
           s"Total elements: $numRows, requested `startIndex`: $startIndex")
     }
-
     if (spillableArray == null) {
       new InMemoryBufferIterator(startIndex)
     } else {

@@ -759,25 +759,6 @@ class JoinSuite extends QueryTest with SharedSQLContext {
         )
       }
 
-      val expected2 = new ListBuffer[Row]()
-      expected2.append(
-        Row(1, 3, 1, 2), Row(1, 3, 1, 2),
-        Row(1, 3, 1, 3), Row(1, 4, 1, 3),
-        Row(1, 4, 1, 5), Row(1, 7, 1, 7),
-        Row(1, 8, 1, 7), Row(2, 1, 2, 1),
-        Row(2, 1, 2, 2), Row(2, 2, 2, 1),
-        Row(2, 2, 2, 2), Row(2, 2, 2, 3),
-        Row(2, 3, 2, 2), Row(2, 3, 2, 3),
-        Row(3, 2, 3, 3), Row(3, 3, 3, 3),
-        Row(3, 5, 3, 6)
-      )
-      assertSpilled(sparkContext, "inner range join") {
-        checkAnswer(
-          testData4.join(testData5, ('a === 'c ) and ('b between('d - 1, 'd + 1))),
-          expected2
-        )
-      }
-
       // FULL OUTER JOIN still does not use [[ExternalAppendOnlyUnsafeRowArray]]
       // so should not cause any spill
       assertNotSpilled(sparkContext, "full outer join") {
@@ -794,6 +775,31 @@ class JoinSuite extends QueryTest with SharedSQLContext {
               |  big.key = small.a
             """.stripMargin),
           expected
+        )
+      }
+    }
+  }
+
+  test("test SortMergeJoin inner range (with spill)") {
+    withSQLConf("spark.sql.sortMergeJoinExec.buffer.in.memory.threshold" -> "0",
+      "spark.sql.sortMergeJoinExec.buffer.spill.threshold" -> "1") {
+
+      val expected2 = new ListBuffer[Row]()
+      expected2.append(
+        Row(1, 3, 1, 2), Row(1, 3, 1, 2),
+        Row(1, 3, 1, 3), Row(1, 4, 1, 3),
+        Row(1, 4, 1, 5), Row(1, 7, 1, 7),
+        Row(1, 8, 1, 7), Row(2, 1, 2, 1),
+        Row(2, 1, 2, 2), Row(2, 2, 2, 1),
+        Row(2, 2, 2, 2), Row(2, 2, 2, 3),
+        Row(2, 3, 2, 2), Row(2, 3, 2, 3),
+        Row(3, 2, 3, 3), Row(3, 3, 3, 3),
+        Row(3, 5, 3, 6)
+      )
+      assertSpilled(sparkContext, "inner range join") {
+        checkAnswer(
+          testData4.join(testData5, ('a === 'c ) and ('b between('d - 1, 'd + 1))),
+          expected2
         )
       }
     }

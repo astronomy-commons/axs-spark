@@ -162,7 +162,6 @@ public final class UnsafeInMemorySorter {
    * Free the memory used by pointer array.
    */
   public void free() {
-    System.err.println("Memory SORTER: free ");
     if (consumer != null) {
       if (array != null) {
         consumer.freeArray(array);
@@ -172,7 +171,6 @@ public final class UnsafeInMemorySorter {
   }
 
   public void reset() {
-    System.err.println("Memory SORTER: reset ");
     if (consumer != null) {
       consumer.freeArray(array);
       // the call to consumer.allocateArray may trigger a spill which in turn access this instance
@@ -304,7 +302,6 @@ public final class UnsafeInMemorySorter {
       }
       // This pointer points to a 4-byte record length, followed by the record's bytes
       final long recordPointer = array.get(offset + position);
-      System.err.println("loadNext Record pointer: "+recordPointer+", "+offset+", "+position);
       currentPageNumber = TaskMemoryManager.decodePageNumber(recordPointer);
       int uaoSize = UnsafeAlignedOffset.getUaoSize();
       baseObject = memoryManager.getPage(recordPointer);
