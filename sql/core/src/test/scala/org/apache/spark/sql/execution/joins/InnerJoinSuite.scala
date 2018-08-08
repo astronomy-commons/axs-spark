@@ -244,28 +244,6 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
     }
 
     configOptions.zipWithIndex.foreach { case ((config, confValue), counter) =>
-      test(s"$testName using SortMergeJoin with spill over $counter") {
-        if (expectRangeJoin) {
-          withSQLConf(SQLConf.SORT_MERGE_JOIN_EXEC_BUFFER_IN_MEMORY_THRESHOLD.key -> "1",
-            SQLConf.SORT_MERGE_JOIN_EXEC_BUFFER_SPILL_THRESHOLD.key -> "2",
-            config -> confValue) {
-            extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
-            boundCondition, _, _) =>
-              assert(rangeConditions.size == 2)
-              withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
-                checkAnswer2(leftRows, rightRows, (leftPlan: SparkPlan, rightPlan: SparkPlan) =>
-                  makeSortMergeJoin(leftKeys, rightKeys, boundCondition, rangeConditions,
-                    leftPlan, rightPlan),
-                  expectedAnswer.map(Row.fromTuple),
-                  sortAnswers = true)
-              }
-            }
-          }
-        }
-      }
-    }
-
-    configOptions.zipWithIndex.foreach { case ((config, confValue), counter) =>
       test(s"$testName using CartesianProduct $counter") {
         withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1",
           SQLConf.CROSS_JOINS_ENABLED.key -> "true", config -> confValue) {
