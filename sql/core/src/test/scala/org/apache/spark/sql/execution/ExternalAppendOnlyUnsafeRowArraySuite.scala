@@ -113,9 +113,9 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
 
   val asQueueVals = Array(false, true)
 
+  asQueueVals.foreach(q => {
   test("insert rows less than the inMemoryThreshold") {
     val (inMemoryThreshold, spillThreshold) = (100, 50)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
 
@@ -135,12 +135,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
 
         assert(!iterator1.hasNext)
         assert(!iterator2.hasNext)
-      }})
-  }
+      }
+  }})
 
+  asQueueVals.foreach(q => {
   test("insert rows more than the inMemoryThreshold but less than spillThreshold") {
     val (inMemoryThreshold, spillThreshold) = (10, 50)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
         val expectedValues = populateRows(array, inMemoryThreshold - 1)
@@ -159,12 +159,12 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
 
         assert(!iterator1.hasNext)
         intercept[ConcurrentModificationException](iterator1.next())
-      }})
-  }
+      }
+  }})
 
+  asQueueVals.foreach(q => {
   test("insert rows enough to force spill") {
     val (inMemoryThreshold, spillThreshold) = (20, 10)
-    asQueueVals.foreach(q => {
       withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
         assert(array.isEmpty)
         val expectedValues = populateRows(array, inMemoryThreshold - 1)
@@ -183,8 +183,8 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
 
         assert(!iterator1.hasNext)
         intercept[ConcurrentModificationException](iterator1.next())
-      }})
-  }
+      }
+  }})
 
   test("iterator on an empty array should be empty") {
     asQueueVals.foreach(q => {
@@ -365,27 +365,27 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
   test("clear array (with spill)") {
     val (inMemoryThreshold, spillThreshold) = (10, 20)
     asQueueVals.foreach(q => {
-      withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
-        // Populate enough rows to trigger spill
-        populateRows(array, spillThreshold * 2)
-        val bytesSpilled = getNumBytesSpilled
-        assert(bytesSpilled > 0)
+    withExternalArray(inMemoryThreshold, spillThreshold, q) { array =>
+      // Populate enough rows to trigger spill
+      populateRows(array, spillThreshold * 2)
+      val bytesSpilled = getNumBytesSpilled
+      assert(bytesSpilled > 0)
 
-        // Clear the array
-        array.clear()
-        assert(array.isEmpty)
+      // Clear the array
+      array.clear()
+      assert(array.isEmpty)
 
-        // Re-populate the array ... but NOT upto the point that there is spill.
-        // Verify data. Verify that there was NO "extra" spill
-        val expectedValues = populateRows(array, spillThreshold / 2)
-        validateData(array, expectedValues)
-        assert(getNumBytesSpilled == bytesSpilled)
+      // Re-populate the array ... but NOT upto the point that there is spill.
+      // Verify data. Verify that there was NO "extra" spill
+      val expectedValues = populateRows(array, spillThreshold / 2)
+      validateData(array, expectedValues)
+      assert(getNumBytesSpilled == bytesSpilled)
 
-        // Populate more rows to trigger spill
-        // Verify the data. Verify that there was "extra" spill
-        populateRows(array, spillThreshold * 2, expectedValues)
-        validateData(array, expectedValues)
-        assert(getNumBytesSpilled > bytesSpilled)
-      }})
+      // Populate more rows to trigger spill
+      // Verify the data. Verify that there was "extra" spill
+      populateRows(array, spillThreshold * 2, expectedValues)
+      validateData(array, expectedValues)
+      assert(getNumBytesSpilled > bytesSpilled)
+    }})
   }
 }
