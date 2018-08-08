@@ -43,12 +43,26 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
       SparkEnv.get.blockManager,
       SparkEnv.get.serializerManager,
       taskContext,
+      false,
+      1024,
+      SparkEnv.get.memoryManager.pageSizeBytes,
+      inMemoryThreshold,
+      spillThreshold)
+    val arrayAsQueue = new ExternalAppendOnlyUnsafeRowArray(
+      taskContext.taskMemoryManager(),
+      SparkEnv.get.blockManager,
+      SparkEnv.get.serializerManager,
+      taskContext,
+      false,
       1024,
       SparkEnv.get.memoryManager.pageSizeBytes,
       inMemoryThreshold,
       spillThreshold)
     try f(array) finally {
       array.clear()
+    }
+    try f(arrayAsQueue) finally {
+      arrayAsQueue.clear()
     }
   }
 
