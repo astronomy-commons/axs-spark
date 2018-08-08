@@ -780,8 +780,8 @@ class JoinSuite extends QueryTest with SharedSQLContext {
               |FROM
               |  testData4 left, testData5 right
               |WHERE
-              |  left.a = right.a and (left.b <= right.b + 1)
-              |                   and (left.b >= right.b - 1)
+              |  left.a = right.c and (left.b <= right.d + 1)
+              |                   and (left.b >= right.d - 1)
               |ORDER BY a,b,c,d
             """.stripMargin),
           expected2

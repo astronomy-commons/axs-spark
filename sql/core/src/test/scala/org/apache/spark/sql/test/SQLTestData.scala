@@ -78,7 +78,7 @@ private[sql] trait SQLTestData { self =>
       TestData2(1, 10) :: TestData2(2, 1) :: TestData2(2, 2) :: TestData2(2, 3) ::
       TestData2(2, 8) :: TestData2(3, 1) :: TestData2(3, 2) :: TestData2(3, 3) ::
       TestData2(3, 5) :: TestData2(4, 1) :: TestData2(4, 2) :: TestData2(4, 3) ::
-      Nil).toDF("a", "b")
+      Nil).toDF()
     df.orderBy("a").sortWithinPartitions("b").
       createOrReplaceTempView("testData4")
     df
@@ -90,8 +90,8 @@ private[sql] trait SQLTestData { self =>
       TestData2(1, 5) :: TestData2(1, 7) :: TestData2(1, 20) ::
       TestData2(2, 1) :: TestData2(2, 2) :: TestData2(2, 3) :: TestData2(2, 5) ::
       TestData2(2, 6) :: TestData2(3, 3) :: TestData2(3, 6) ::
-      Nil).toDF("a", "b")
-    df.orderBy("a").sortWithinPartitions("b").
+      Nil).toDF("c", "d")
+    df.orderBy("c").sortWithinPartitions("d").
       createOrReplaceTempView("testData5")
     df
   }
