@@ -610,13 +610,13 @@ case class SortMergeJoinExec(
            |private void dequeueUntilUpperConditionHolds() {
            |  if($matches.isEmpty())
            |    return;
-           |  $rightTmpRow = $matches.peek().get();
+           |  $rightTmpRow = (InternalRow) $matches.peek().get();
            |  $javaType tempVal = getRightTmpRangeValue();
            |  while(${leftLowerSecRangeKey.value} $upperCompop tempVal) {
            |    $matches.dequeue();
            |    if($matches.isEmpty())
            |      break;
-           |    $rightTmpRow = $matches.peek().get();
+           |    $rightTmpRow = (InternalRow) $matches.peek().get();
            |    tempVal = getRightTmpRangeValue();
            |  }
            |}
