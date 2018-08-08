@@ -229,7 +229,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
           withSQLConf(SQLConf.USE_SMJ_INNER_RANGE_OPTIMIZATION.key -> "false") {
             extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
             boundCondition, _, _) =>
-              assert(rangeConditions.isEmpty)
+              assert(rangeConditions.size == 2)
               withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
                 checkAnswer2(leftRows, rightRows, (leftPlan: SparkPlan, rightPlan: SparkPlan) =>
                   makeSortMergeJoin(leftKeys, rightKeys, boundCondition, rangeConditions,
@@ -243,7 +243,7 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
             SQLConf.SORT_MERGE_JOIN_EXEC_BUFFER_SPILL_THRESHOLD.key -> "2") {
             extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
             boundCondition, _, _) =>
-              assert(rangeConditions.isEmpty)
+              assert(rangeConditions.size == 2)
               withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
                 checkAnswer2(leftRows, rightRows, (leftPlan: SparkPlan, rightPlan: SparkPlan) =>
                   makeSortMergeJoin(leftKeys, rightKeys, boundCondition, rangeConditions,
