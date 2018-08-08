@@ -553,14 +553,15 @@ case class SortMergeJoinExec(
       }
 
     // A queue to hold all matched rows from right side.
-    val clsName = if (useInnerRange) classOf[InMemoryUnsafeRowQueue].getName
-      else classOf[ExternalAppendOnlyUnsafeRowArray].getName
+    val clsName = classOf[ExternalAppendOnlyUnsafeRowArray].getName
 
     val spillThreshold = getSpillThreshold
     val inMemoryThreshold = getInMemoryThreshold
 
-    val matches = ctx.addMutableState(clsName, "matches",
-      v => s"$v = new $clsName($inMemoryThreshold, $spillThreshold);", forceInline = true)
+    val matches = if (useInnerRange) ctx.addMutableState(clsName, "matches",
+        v => s"$v = new $clsName($inMemoryThreshold, $spillThreshold, true);", forceInline = true)
+      else ctx.addMutableState(clsName, "matches",
+        v => s"$v = new $clsName($inMemoryThreshold, $spillThreshold);", forceInline = true)
     val matchedKeyVars = copyKeys(ctx, leftKeyVars)
 
     val lowerCompop = lowerSecondaryRangeExpression.map {
@@ -609,13 +610,13 @@ case class SortMergeJoinExec(
            |private void dequeueUntilUpperConditionHolds() {
            |  if($matches.isEmpty())
            |    return;
-           |  $rightTmpRow = $matches.get(0);
+           |  $rightTmpRow = $matches.peek();
            |  $javaType tempVal = getRightTmpRangeValue();
            |  while(${leftLowerSecRangeKey.value} $upperCompop tempVal) {
            |    $matches.dequeue();
            |    if($matches.isEmpty())
            |      break;
-           |    $rightTmpRow = $matches.get(0);
+           |    $rightTmpRow = $matches.peek();
            |    tempVal = getRightTmpRangeValue();
            |  }
            |}
@@ -1096,7 +1097,7 @@ private[joins] class SortMergeJoinInnerRangeScanner(
   /** Buffered rows from the buffered side of the join. This is empty if there are no matches. */
 
   private[this] val bufferedMatches =
-    new InMemoryUnsafeRowQueue(inMemoryThreshold, spillThreshold)
+    new ExternalAppendOnlyUnsafeRowArray(inMemoryThreshold, spillThreshold, true)
 
   private[this] val testJoinRow = new JoinedRow
   private[this] val joinedRow = new JoinedRow
@@ -1114,7 +1115,7 @@ private[joins] class SortMergeJoinInnerRangeScanner(
 
   override def getStreamedRow: InternalRow = streamedRow
 
-  override def getBufferedMatches: InMemoryUnsafeRowQueue = bufferedMatches
+  override def getBufferedMatches: ExternalAppendOnlyUnsafeRowArray = bufferedMatches
 
   /**
    * Advances both input iterators, stopping when we have found rows with matching join keys.
@@ -1278,7 +1279,7 @@ private[joins] class SortMergeJoinInnerRangeScanner(
   private def dequeueUntilUpperConditionHolds(): Unit = {
     if (streamedRow != null) {
       while (!bufferedMatches.isEmpty &&
-          !upperRangeCondition(testJoinRow(streamedRow, bufferedMatches.get(0)))) {
+          !upperRangeCondition(testJoinRow(streamedRow, bufferedMatches.peek.get))) {
         bufferedMatches.dequeue()
       }
     }

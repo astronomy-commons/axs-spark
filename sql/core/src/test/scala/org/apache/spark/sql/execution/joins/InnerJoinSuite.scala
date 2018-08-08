@@ -239,6 +239,20 @@ class InnerJoinSuite extends SparkPlanTest with SharedSQLContext {
               }
             }
           }
+          withSQLConf(SQLConf.SORT_MERGE_JOIN_EXEC_BUFFER_IN_MEMORY_THRESHOLD.key -> "1",
+            SQLConf.SORT_MERGE_JOIN_EXEC_BUFFER_SPILL_THRESHOLD.key -> "2") {
+            extractJoinParts().foreach { case (_, leftKeys, rightKeys, rangeConditions,
+            boundCondition, _, _) =>
+              assert(rangeConditions.isEmpty)
+              withSQLConf(SQLConf.SHUFFLE_PARTITIONS.key -> "1") {
+                checkAnswer2(leftRows, rightRows, (leftPlan: SparkPlan, rightPlan: SparkPlan) =>
+                  makeSortMergeJoin(leftKeys, rightKeys, boundCondition, rangeConditions,
+                    leftPlan, rightPlan),
+                  expectedAnswer.map(Row.fromTuple),
+                  sortAnswers = true)
+              }
+            }
+          }
         }
       }
     }
