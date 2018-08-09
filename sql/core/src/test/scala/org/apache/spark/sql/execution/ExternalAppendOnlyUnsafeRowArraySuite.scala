@@ -309,6 +309,13 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         assert(third.equals(third2))
 
         assert(array.length == 7)
+
+        populateRows(array, 10)
+
+        array.dequeue()
+        array.dequeue()
+
+        assert(array.length == 15)
       }
     }
 
