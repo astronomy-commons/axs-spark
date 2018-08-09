@@ -143,11 +143,13 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
     else if (spillableArray != null) {
       val retval = Some(generateIterator().next)
       numRows -= 1
+      modificationsCount += 1
       spillableArrayOffset += 1
       retval
     }
     else {
       numRows -= 1
+      modificationsCount += 1
       Some(inMemoryQueue.dequeue())
     }
   }

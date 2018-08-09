@@ -781,8 +781,8 @@ class JoinSuite extends QueryTest with SharedSQLContext {
   }
 
   test("test SortMergeJoin inner range (with spill)") {
-    withSQLConf("spark.sql.sortMergeJoinExec.buffer.in.memory.threshold" -> "0",
-      "spark.sql.sortMergeJoinExec.buffer.spill.threshold" -> "1") {
+    withSQLConf("spark.sql.sortMergeJoinExec.buffer.in.memory.threshold" -> "1",
+      "spark.sql.sortMergeJoinExec.buffer.spill.threshold" -> "2") {
 
       val expected2 = new ListBuffer[Row]()
       expected2.append(
