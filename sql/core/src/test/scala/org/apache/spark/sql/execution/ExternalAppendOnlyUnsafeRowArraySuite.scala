@@ -299,13 +299,13 @@ class ExternalAppendOnlyUnsafeRowArraySuite extends SparkFunSuite with LocalSpar
         assert(iterator.hasNext)
         val first = iterator.next()
 
-        val first2 = array.dequeue()
+        val first2 = array.dequeue().get
         assert(first.equals(first2))
-        val second = array.dequeue()
+        val second = array.dequeue().get
         assert(!second.equals(first2))
 
-        val third = array.peek()
-        val third2 = array.dequeue()
+        val third = array.peek().get
+        val third2 = array.dequeue().get
         assert(third.equals(third2))
 
         assert(array.length == 7)
