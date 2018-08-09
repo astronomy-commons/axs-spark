@@ -608,14 +608,18 @@ case class SortMergeJoinExec(
       ctx.addNewFunction("dequeueUntilUpperConditionHolds",
         s"""
            |private void dequeueUntilUpperConditionHolds() {
-           |  if($matches.isEmpty())
+           |  if($matches.isEmpty()) {
+           |    $matches.clear();
            |    return;
+           |  }
            |  $rightTmpRow = (InternalRow) $matches.peek().get();
            |  $javaType tempVal = getRightTmpRangeValue();
            |  while(${leftLowerSecRangeKey.value} $upperCompop tempVal) {
            |    $matches.dequeue();
-           |    if($matches.isEmpty())
+           |    if($matches.isEmpty()) {
+           |      $matches.clear();
            |      break;
+           |    }
            |    $rightTmpRow = (InternalRow) $matches.peek().get();
            |    tempVal = getRightTmpRangeValue();
            |  }
