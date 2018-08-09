@@ -194,6 +194,8 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
           numRowsSpillThreshold,
           false)
 
+        spillableArrayOffset = 0
+
         // populate with existing in-memory buffered rows
         if (asQueue && inMemoryQueue != null) {
           inMemoryQueue.foreach(existingUnsafeRow =>
