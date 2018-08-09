@@ -672,8 +672,7 @@ case class SortMergeJoinExec(
          |      ${genComparison(ctx, leftKeyVars, matchedKeyVars)}
          |      if (comp == 0) {
          |        dequeueUntilUpperConditionHolds();
-         |      }
-         |      else {
+         |      } else {
          |        $matches.clear();
          |      }
          |    }
@@ -703,6 +702,8 @@ case class SortMergeJoinExec(
          |        if (!$matches.isEmpty()) {
          |          ${matchedKeyVars.map(_.code).mkString("\n")}
          |          return true;
+         |        } else {
+         |          $matches.clear();
          |        }
          |        $leftRow = null;
          |      } else {
