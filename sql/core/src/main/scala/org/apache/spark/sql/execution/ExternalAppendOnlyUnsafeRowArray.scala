@@ -56,7 +56,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
     numRowsInMemoryBufferThreshold: Int,
     numRowsSpillThreshold: Int) extends Logging {
 
-  // scalastyle:off println
   def this(numRowsInMemoryBufferThreshold: Int, numRowsSpillThreshold: Int) {
     this(
       TaskContext.get().taskMemoryManager(),
@@ -118,7 +117,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
    * Clears up resources (eg. memory) held by the backing storage
    */
   def clear(): Unit = {
-    System.out.println("clear")
     if (spillableArray != null) {
       // The last `spillableArray` of this task will be cleaned up via task completion listener
       // inside `UnsafeExternalSorter`
@@ -136,7 +134,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
   }
 
   def dequeue(): Option[UnsafeRow] = {
-    System.out.println("dequeue")
     if (!asQueue) {
       throw new IllegalStateException("Not instantiated as a queue!")
     }
@@ -158,7 +155,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
   }
 
   def peek(): Option[UnsafeRow] = {
-    System.out.println("peek")
     if (!asQueue) {
       throw new IllegalStateException("Not instantiated as a queue!")
     }
@@ -174,7 +170,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
   }
 
   def add(unsafeRow: UnsafeRow): Unit = {
-    System.out.println("add")
     if (numRows < numRowsInMemoryBufferThreshold) {
       if (asQueue) {
         inMemoryQueue += unsafeRow.copy()
@@ -247,7 +242,6 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
    * have read all the data while there were new rows added to this array.
    */
   def generateIterator(startIndex: Int): Iterator[UnsafeRow] = {
-    System.out.println("generateIterator " + startIndex)
     if (startIndex < 0 || (numRows > 0 && startIndex > numRows)) {
       throw new ArrayIndexOutOfBoundsException(
         "Invalid `startIndex` provided for generating iterator over the array. " +
