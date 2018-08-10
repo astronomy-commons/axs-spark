@@ -170,7 +170,7 @@ private[sql] class ExternalAppendOnlyUnsafeRowArray(
   }
 
   def add(unsafeRow: UnsafeRow): Unit = {
-    if (numRows < numRowsInMemoryBufferThreshold) {
+    if (spillableArray == null && numRows < numRowsInMemoryBufferThreshold) {
       if (asQueue) {
         inMemoryQueue += unsafeRow.copy()
       } else {
