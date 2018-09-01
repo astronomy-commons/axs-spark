@@ -1814,6 +1814,7 @@ case class ArrayLength(child: Expression) extends UnaryExpression with ImplicitC
     ev.copy(code =
       code"""
             |${childGen.code}
+            |boolean ${ev.isNull} = false;
             |int ${ev.value} = ${childGen.value}.numElements();
       """.stripMargin)
   }
