@@ -3455,6 +3455,14 @@ object functions {
   def sort_array(e: Column, asc: Boolean): Column = withExpr { SortArray(e.expr, lit(asc).expr) }
 
   /**
+    * Returns the length of the array.
+    *
+    * @group collection_funcs
+    * @since 2.4.0
+    */
+  def array_length(e: Column): Column = withExpr { ArrayLength(e.expr) }
+
+  /**
    * Returns the minimum value in the array.
    *
    * @group collection_funcs
