@@ -409,6 +409,7 @@ object FunctionRegistry {
 
     // collection functions
     expression[CreateArray]("array"),
+    expression[ArrayLength]("array_length"),
     expression[ArrayContains]("array_contains"),
     expression[ArraysOverlap]("arrays_overlap"),
     expression[ArrayIntersect]("array_intersect"),
