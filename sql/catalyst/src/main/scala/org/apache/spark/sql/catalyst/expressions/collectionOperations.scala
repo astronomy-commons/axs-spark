@@ -2046,7 +2046,7 @@ case class ArrayMax(child: Expression) extends UnaryExpression with ImplicitCast
   """, since = "2.4.0")
 case class ArrayLength(child: Expression) extends UnaryExpression with ImplicitCastInputTypes {
 
-  override def nullable: Boolean = true
+  override def nullable: Boolean = false
 
   override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType)
 
