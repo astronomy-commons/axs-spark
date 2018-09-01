@@ -1782,6 +1782,54 @@ case class ArrayMax(child: Expression) extends UnaryExpression with ImplicitCast
   override def prettyName: String = "array_max"
 }
 
+/**
+ * Returns length of the array.
+ */
+@ExpressionDescription(
+  usage = "_FUNC_(array) - Returns length of the array.",
+  examples = """
+    Examples:
+      > SELECT _FUNC_(array(1, 20, null, 3));
+       4
+  """, since = "2.4.0")
+case class ArrayLength(child: Expression) extends UnaryExpression with ImplicitCastInputTypes {
+
+  override def nullable: Boolean = true
+
+  override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType)
+
+  private lazy val ordering = TypeUtils.getInterpretedOrdering(IntegerType)
+
+  override def checkInputDataTypes(): TypeCheckResult = {
+    val typeCheckResult = super.checkInputDataTypes()
+    if (typeCheckResult.isSuccess) {
+      TypeUtils.checkForOrderingExpr(dataType, s"function $prettyName")
+    } else {
+      typeCheckResult
+    }
+  }
+
+  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val childGen = child.genCode(ctx)
+    ev.copy(code =
+      code"""
+            |${childGen.code}
+            |${ev.value} = ${childGen.value}.numElements();
+      """.stripMargin)
+  }
+
+  override protected def nullSafeEval(input: Any): Any = {
+    Option(input).map(_.asInstanceOf[ArrayData].numElements()).orNull
+  }
+
+  override def dataType: DataType = child.dataType match {
+    case ArrayType(dt, _) => IntegerType
+    case _ => throw new IllegalStateException(s"$prettyName accepts only arrays.")
+  }
+
+  override def prettyName: String = "array_length"
+}
+
 
 /**
  * Returns the position of the first occurrence of element in the given array as long.
