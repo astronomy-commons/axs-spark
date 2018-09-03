@@ -1987,8 +1987,8 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     val getValue = CodeGenerator.getValue(arval, et, i)
 
     val c = code"""
-      |$arCode
-      |$elCode
+      |${arCode.code}
+      |${elCode.code}
       |${listClss} $arrayListName = new $listClss();
       |for(int $i = 0; $i < $arval.numElements(); $i ++) {
       |  if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
