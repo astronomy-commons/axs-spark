@@ -1973,7 +1973,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val et = dataType.elementType
 
-    val arrUtilsClss = classOf[ArrayUtils].getName
+//    val arrUtilsClss = classOf[ArrayUtils].getName
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
     val arrayListName = ctx.freshName("arrayList")
     val arrayName = ctx.freshName("arrayObject")
@@ -1996,8 +1996,10 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |  }
       |}
       |final ArrayData $arrayName = new $genericArrayClass(
-      |  ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
+      |  $arrayListName.stream().mapToInt(i -> i).toArray());
       """
+
+//    ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
 
     ev.copy(
       code = c,
