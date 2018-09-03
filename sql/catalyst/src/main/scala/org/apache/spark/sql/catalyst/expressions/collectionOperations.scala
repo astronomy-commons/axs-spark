@@ -19,6 +19,7 @@ package org.apache.spark.sql.catalyst.expressions
 import java.util
 import java.util.{Comparator, TimeZone}
 
+import com.google.common.primitives.Ints
 import org.apache.commons.lang3.ArrayUtils
 
 import scala.collection.mutable
@@ -1974,6 +1975,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     val et = dataType.elementType
 
 //    val arrUtilsClss = classOf[ArrayUtils].getName
+    val guavaInts = classOf[Ints].getName
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
     val arrayListName = ctx.freshName("arrayList")
     val arrayName = ctx.freshName("arrayObject")
@@ -1995,11 +1997,11 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |    $arrayListName.add(($i + 1));
       |  }
       |}
-      |final ArrayData $arrayName = new $genericArrayClass(
-      |  $arrayListName.stream().mapToInt(i -> i).toArray());
+      |final ArrayData $arrayName = new $genericArrayClass($guavaInts.toArray($arrayListName);
       """
 
 //    ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
+//    $arrayListName.stream().mapToInt(i -> i).toArray());
 
     ev.copy(
       code = c,
