@@ -1997,7 +1997,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |    $arrayListName.add(($i + 1));
       |  }
       |}
-      |final ArrayData $arrayName = new $genericArrayClass($guavaInts.toArray($arrayListName);
+      |final ArrayData $arrayName = new $genericArrayClass($guavaInts.toArray($arrayListName));
       """
 
 //    ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
