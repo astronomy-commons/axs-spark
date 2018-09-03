@@ -16,11 +16,13 @@
  */
 package org.apache.spark.sql.catalyst.expressions
 
+import java.util
 import java.util.{Comparator, TimeZone}
+
+import org.apache.commons.lang3.ArrayUtils
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
-
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{TypeCheckResult, TypeCoercion}
 import org.apache.spark.sql.catalyst.expressions.ArraySortLike.NullOrder
@@ -1901,6 +1903,107 @@ case class ArrayPosition(left: Expression, right: Expression)
          |${ev.value} = (long) $pos;
        """.stripMargin
     })
+  }
+}
+
+/**
+ * Returns the position of all occurrences of element in the given array as an array of longs.
+ * Returns an empty array if the given value could not be found in the array. Returns null if
+ * either of the arguments are null.
+ *
+ * NOTE: that these are not zero based, but 1-based indices. The first element in the array has
+ *       index 1.
+ */
+@ExpressionDescription(
+  usage = """
+    _FUNC_(array, element) - Returns an array of (1-based) indices of the element in the array.
+  """,
+  examples = """
+    Examples:
+      > SELECT _FUNC_(array(3, 2, 1, 3), 3);
+       (1, 4)
+  """,
+  since = "2.4.0")
+case class ArrayAllPositions(array: Expression, element: Expression)
+  extends Expression with ImplicitCastInputTypes {
+
+  @transient private lazy val ordering: Ordering[Any] =
+    TypeUtils.getInterpretedOrdering(element.dataType)
+
+  override def nullable: Boolean = false
+
+  override def foldable: Boolean = array.foldable && element.foldable
+
+  override def children: Seq[Expression] = Seq(array, element)
+
+  override def dataType: ArrayType = ArrayType(IntegerType, false)
+
+  override def inputTypes: Seq[AbstractDataType] = {
+    val elementType = array.dataType match {
+      case t: ArrayType => t.elementType
+      case _ => AnyDataType
+    }
+    Seq(ArrayType, elementType)
+  }
+
+  override def checkInputDataTypes(): TypeCheckResult = {
+    super.checkInputDataTypes() match {
+      case f: TypeCheckResult.TypeCheckFailure => f
+      case TypeCheckResult.TypeCheckSuccess =>
+        TypeUtils.checkForOrderingExpr(element.dataType, s"function $prettyName")
+    }
+  }
+
+  override def eval(row: InternalRow): Any = {
+    val res = scala.collection.mutable.ArrayBuffer.empty[Int]
+    val value = element.eval(row)
+    val ar = array.eval(row)
+    if(ar != null) {
+      ar.asInstanceOf[ArrayData].foreach(element.dataType, (i, v) =>
+        if (v != null && ordering.equiv(v, value)) {
+          res += (i + 1)
+        }
+      )
+    }
+    new GenericArrayData(res.toArray)
+  }
+
+  override def prettyName: String = "array_allpositions"
+
+  override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val et = dataType.elementType
+
+    val arrUtilsClss = classOf[ArrayUtils].getName
+    val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
+    val arrayListName = ctx.freshName("arrayList")
+    val arrayName = ctx.freshName("arrayObject")
+    val genericArrayClass = classOf[GenericArrayData].getName
+    val i = ctx.freshName("i")
+
+    val arCode = array.genCode(ctx)
+    val elCode = element.genCode(ctx)
+    val arval = arCode.value
+    val elval = elCode.value
+    val getValue = CodeGenerator.getValue(arval, et, i)
+
+    val c = code"""
+      |$arCode
+      |$elCode
+      |${listClss} $arrayListName = new $listClss();
+      |for(int $i = 0; $i < $arval.numElements(); $i ++) {
+      |  if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
+      |    $arrayListName.add(($i + 1));
+      |  }
+      |}
+      |final ArrayData $arrayName = new $genericArrayClass(
+      |  ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
+      """
+
+    ev.copy(
+      code = c,
+      value = JavaCode.variable(arrayName, dataType),
+      isNull = FalseLiteral)
+
   }
 }
 

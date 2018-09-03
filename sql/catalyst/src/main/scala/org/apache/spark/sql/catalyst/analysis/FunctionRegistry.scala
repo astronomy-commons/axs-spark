@@ -414,6 +414,7 @@ object FunctionRegistry {
     expression[ArraysOverlap]("arrays_overlap"),
     expression[ArrayJoin]("array_join"),
     expression[ArrayPosition]("array_position"),
+    expression[ArrayAllPositions]("array_allpositions"),
     expression[ArraySort]("array_sort"),
     expression[CreateMap]("map"),
     expression[CreateNamedStruct]("named_struct"),
