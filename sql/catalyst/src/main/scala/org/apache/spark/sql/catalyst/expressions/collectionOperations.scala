@@ -1786,56 +1786,6 @@ case class ArrayMax(child: Expression) extends UnaryExpression with ImplicitCast
 }
 
 /**
- * Returns length of the array.
- */
-@ExpressionDescription(
-  usage = "_FUNC_(array) - Returns length of the array.",
-  examples = """
-    Examples:
-      > SELECT _FUNC_(array(1, 20, null, 3));
-       4
-  """, since = "2.4.0")
-case class ArrayLength(child: Expression) extends UnaryExpression with ImplicitCastInputTypes {
-
-  override def nullable: Boolean = false
-
-  override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType)
-
-  private lazy val ordering = TypeUtils.getInterpretedOrdering(IntegerType)
-
-  override def checkInputDataTypes(): TypeCheckResult = {
-    val typeCheckResult = super.checkInputDataTypes()
-    if (typeCheckResult.isSuccess) {
-      TypeUtils.checkForOrderingExpr(dataType, s"function $prettyName")
-    } else {
-      typeCheckResult
-    }
-  }
-
-  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val childGen = child.genCode(ctx)
-    ev.copy(code =
-      code"""
-            |${childGen.code}
-            |boolean ${ev.isNull} = false;
-            |int ${ev.value} = ${childGen.value}.numElements();
-      """.stripMargin)
-  }
-
-  override protected def nullSafeEval(input: Any): Any = {
-    Option(input).map(_.asInstanceOf[ArrayData].numElements()).orNull
-  }
-
-  override def dataType: DataType = child.dataType match {
-    case ArrayType(dt, _) => IntegerType
-    case _ => throw new IllegalStateException(s"$prettyName accepts only arrays.")
-  }
-
-  override def prettyName: String = "array_length"
-}
-
-
-/**
  * Returns the position of the first occurrence of element in the given array as long.
  * Returns 0 if the given value could not be found in the array. Returns null if either of
  * the arguments are null
@@ -1974,10 +1924,11 @@ case class ArrayAllPositions(array: Expression, element: Expression)
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val et = dataType.elementType
 
-//    val arrUtilsClss = classOf[ArrayUtils].getName
-    val guavaInts = classOf[Ints].getName
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
-    val arrayListName = ctx.freshName("arrayList")
+
+    val arrayListName = ctx.addMutableState(listClss, "indexBuffer",
+      v => s"$v = new $listClss();", forceInline = true)
+
     val arrayName = ctx.freshName("arrayObject")
     val genericArrayClass = classOf[GenericArrayData].getName
     val i = ctx.freshName("i")
@@ -1991,23 +1942,21 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     val c = code"""
       |${arCode.code}
       |${elCode.code}
-      |${listClss} $arrayListName = new $listClss();
-      |for(int $i = 0; $i < $arval.numElements(); $i ++) {
-      |  if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
-      |    $arrayListName.add(($i + 1));
+      |${arrayListName}.clear();
+      |if(!${arCode.isNull}) {
+      |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
+      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
+      |      $arrayListName.add($i + 1);
+      |    }
       |  }
       |}
-      |final ArrayData $arrayName = new $genericArrayClass($guavaInts.toArray($arrayListName));
+      |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
       """
-
-//    ${arrUtilsClss}.toPrimitive(${arrayListName}.toArray(new Integer[]{})));
-//    $arrayListName.stream().mapToInt(i -> i).toArray());
 
     ev.copy(
       code = c,
       value = JavaCode.variable(arrayName, dataType),
       isNull = FalseLiteral)
-
   }
 }
 
