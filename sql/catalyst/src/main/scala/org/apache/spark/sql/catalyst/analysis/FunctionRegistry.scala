@@ -428,6 +428,7 @@ object FunctionRegistry {
     expression[Size]("cardinality"),
     expression[ArraysZip]("arrays_zip"),
     expression[SortArray]("sort_array"),
+    expression[ArraySelect]("array_select"),
     expression[ArrayMin]("array_min"),
     expression[ArrayMax]("array_max"),
     expression[Reverse]("reverse"),

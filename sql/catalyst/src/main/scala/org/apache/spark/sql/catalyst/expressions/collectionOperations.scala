@@ -1656,6 +1656,79 @@ case class ArrayJoin(
 }
 
 /**
+ * Creates a String containing all the elements of the input array separated by the delimiter.
+ */
+@ExpressionDescription(
+  usage = """
+    _FUNC_(array, delimiter[, nullReplacement]) - Concatenates the elements of the given array
+      using the delimiter and an optional string to replace nulls. If no value is set for
+      nullReplacement, any null value is filtered.""",
+  examples = """
+    Examples:
+      > SELECT _FUNC_(array('hello', 'world'), ' ');
+       hello world
+      > SELECT _FUNC_(array('hello', null ,'world'), ' ');
+       hello world
+      > SELECT _FUNC_(array('hello', null ,'world'), ' ', ',');
+       hello , world
+  """, since = "2.4.0")
+case class ArraySelect(
+                      array: Expression,
+                      indexes: Expression,
+                      ignoreOutOfBounds: Boolean) extends Expression with ExpectsInputTypes {
+
+  def this(array: Expression, indexes: Expression) = this(array, indexes, false)
+
+  override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType, ArrayType(IntegerType))
+
+  override def children: Seq[Expression] = Seq(array, indexes)
+
+  override def nullable: Boolean = children.exists(_.nullable)
+
+  override def foldable: Boolean = children.forall(_.foldable)
+
+  override def eval(input: InternalRow): Any = {
+    val arrayEval = array.eval(input)
+    if (arrayEval == null) return null
+    val indexesEval = indexes.eval(input)
+    if (indexesEval == null) return null
+
+    val ids = indexesEval.asInstanceOf[ArrayData]
+    val arr = arrayEval.asInstanceOf[ArrayData]
+    val dt = array.dataType
+
+    val numIds = ids.numElements()
+    val arrln = arrayEval.asInstanceOf[ArrayData].numElements()
+    val arrayOut: Array[Any] = new Array(numIds)
+
+    for(i <- 0 until numIds) {
+      val id = ids.getInt(i)
+      if (id < arrln) {
+        arrayOut(id) = arr.get(i, dt)
+      } else if (!ignoreOutOfBounds) {
+        throw new RuntimeException(s"Array selection failed: index $i is larger " +
+          s"than array length $arrln.")
+      }
+    }
+
+    new GenericArrayData(arrayOut)
+  }
+
+  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+
+
+    ev.copy(
+      code"""
+            |UTF8String ${ev.value} = null;
+       """.stripMargin, FalseLiteral)
+  }
+
+  override def dataType: DataType = array.dataType
+
+  override def prettyName: String = "array_select"
+}
+
+/**
  * Returns the minimum value in the array.
  */
 @ExpressionDescription(
@@ -1946,7 +2019,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |if(!${arCode.isNull}) {
       |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
       |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
-      |      $arrayListName.add($i + 1);
+      |      $arrayListName.add($i);
       |    }
       |  }
       |}
