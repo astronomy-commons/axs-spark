@@ -1908,6 +1908,127 @@ case class ArrayJoin(
 }
 
 /**
+ * Selects elements from `array` corresponding to indexes from `indexes`.
+ *
+ * If `ignoreOutOfBounds` is set to `true`, null values are returned for the elements whose indexes
+ * are out of bounds. An exception is thrown otherwise.
+ *
+ * @note The indexes are 1 based.
+ */
+@ExpressionDescription(
+  usage = """
+    _FUNC_(array, indexes[, ignoreOutOfBounds]) - Selects elements from the given array
+      using indexes from the second array. If ignoreOutOfBounds is true, null values
+      are returned for such elements. Otherwise, an exception is thrown.""",
+  examples = """
+    Examples:
+      > SELECT _FUNC_(array('hello', 'world'), array(1));
+       hello
+      > SELECT _FUNC_(array('hello', null ,'world'), array(1, 3));
+       hello world
+      > SELECT _FUNC_(array('hello', null ,'world'), array(4), false);
+       -- exception is thrown
+  """, since = "3.0.0")
+case class ArraySelect(
+                      array: Expression,
+                      indexes: Expression,
+                      ignoreOutOfBounds: Boolean) extends Expression with ExpectsInputTypes {
+
+  def this(array: Expression, indexes: Expression) = this(array, indexes, false)
+
+  override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType, ArrayType(IntegerType))
+
+  override def children: Seq[Expression] = Seq(array, indexes)
+
+  override def nullable: Boolean = children.exists(_.nullable)
+
+  override def foldable: Boolean = children.forall(_.foldable)
+
+  val valueBuffer = scala.collection.mutable.ArrayBuffer.empty[Any]
+
+  override def eval(input: InternalRow): Any = {
+    val arrayEval = array.eval(input)
+    if (arrayEval == null) return null
+    val indexesEval = indexes.eval(input)
+    if (indexesEval == null) return null
+
+    val ids = indexesEval.asInstanceOf[ArrayData]
+    val arr = arrayEval.asInstanceOf[ArrayData]
+    val dt = array.dataType
+
+    val numIds = ids.numElements()
+    val arrln = arrayEval.asInstanceOf[ArrayData].numElements()
+
+    valueBuffer.clear()
+
+    for(i <- 0 until numIds) {
+      val id = ids.getInt(i) - 1
+      if (id < arrln) {
+        valueBuffer += arr.get(i, dt)
+      } else if (!ignoreOutOfBounds) {
+        throw new RuntimeException(s"Array selection failed: index $i is larger " +
+          s"than array length $arrln.")
+      } else {
+
+      }
+    }
+
+    new GenericArrayData(valueBuffer.toArray)
+  }
+
+  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val arrayName = ctx.freshName("arrayObject")
+
+    val etstr = if (CodeGenerator.isPrimitiveType(elementType)) {
+      CodeGenerator.boxedType(elementType)
+    } else { elementType.typeName }
+
+    val arCode = array.genCode(ctx)
+    val indCode = indexes.genCode(ctx)
+    val arval = arCode.value
+    val indval = indCode.value
+
+    val listClss = classOf[util.ArrayList[Object]].getName + "<" + etstr + ">"
+    val arrayListName = ctx.addMutableState(listClss, "buffer",
+      v => s"$v = new $listClss();", forceInline = true)
+    val genericArrayClass = classOf[GenericArrayData].getName
+    val ind = ctx.freshName("ind")
+    val i = ctx.freshName("i")
+
+    val outOfBoundsCode = if (ignoreOutOfBounds) s"$arrayListName.add(null);"
+    else "throw new RuntimeException(\"Array selection failed: index \"+" + ind + "+\" is larger " +
+      "than array length \"+" + arval + ".numElements()+\".\");"
+
+    val c = code"""
+        |${arCode.code}
+        |${indCode.code}
+        |${arrayListName}.clear();
+        |int $ind = 0;
+        |if(!${arCode.isNull} && !${indCode.isNull}) {
+        |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
+        |    $ind = $indval.getInt($i) - 1;
+        |    if ($arval.numElements() > $ind) {
+        |      $arrayListName.add(${CodeGenerator.getValue(arval, elementType, ind)});
+        |    } else {
+        |      $outOfBoundsCode
+        |    }
+        |  }
+        |}
+        |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
+        """
+
+    ev.copy(code = c,
+      value = JavaCode.variable(arrayName, dataType),
+      isNull = FalseLiteral)
+  }
+
+  override def dataType: ArrayType = array.dataType.asInstanceOf[ArrayType]
+  @transient lazy val elementType = dataType.elementType
+
+  override def prettyName: String = "array_select"
+}
+
+/**
  * Returns the minimum value in the array.
  */
 @ExpressionDescription(
@@ -1923,7 +2044,7 @@ case class ArrayMin(child: Expression) extends UnaryExpression with ImplicitCast
 
   override def inputTypes: Seq[AbstractDataType] = Seq(ArrayType)
 
-  @transient private lazy val ordering = TypeUtils.getInterpretedOrdering(dataType)
+  private lazy val ordering = TypeUtils.getInterpretedOrdering(dataType)
 
   override def checkInputDataTypes(): TypeCheckResult = {
     val typeCheckResult = super.checkInputDataTypes()
