@@ -1715,12 +1715,27 @@ case class ArraySelect(
   }
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
+    val arrayName = ctx.freshName("arrayObject")
 
+    val arCode = array.genCode(ctx)
+    val indCode = indexes.genCode(ctx)
 
-    ev.copy(
-      code"""
-            |UTF8String ${ev.value} = null;
-       """.stripMargin, FalseLiteral)
+    val c = code"""
+        |${arCode.code}
+        |${indCode.code}
+        |${arrayListName}.clear();
+        |if(!${arCode.isNull} && !${indCode.isNull}) {
+        |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
+        |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
+        |      $arrayListName.add($i);
+        |    }
+        |  }
+        |}
+        |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
+      """
+
+    ev.copy(code = c,
+      value = JavaCode.variable(arrayName, dataType))
   }
 
   override def dataType: DataType = array.dataType
