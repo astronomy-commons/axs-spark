@@ -3474,8 +3474,8 @@ object functions {
     * @group collection_funcs
     * @since 2.4.0
     */
-  def array_select(e: Column, ids: Column, ignoreOutOfIndex): Column =
-    withExpr { ArraySelect(e.expr, ids, ignoreOutOfIndex) }
+  def array_select(e: Column, ids: Column, ignoreOutOfIndex: Boolean): Column =
+    withExpr { ArraySelect(e.expr, ids.expr, ignoreOutOfIndex) }
 
   /**
    * Returns the minimum value in the array.
