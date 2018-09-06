@@ -3699,6 +3699,15 @@ object functions {
   def sort_array(e: Column, asc: Boolean): Column = withExpr { SortArray(e.expr, lit(asc).expr) }
 
   /**
+    * Returns the minimum value in the array.
+    *
+    * @group collection_funcs
+    * @since 2.4.0
+    */
+  def array_select(e: Column, ids: Column, ignoreOutOfIndex: Boolean): Column =
+    withExpr { ArraySelect(e.expr, ids.expr, ignoreOutOfIndex) }
+
+  /**
    * Returns the minimum value in the array.
    *
    * @group collection_funcs
