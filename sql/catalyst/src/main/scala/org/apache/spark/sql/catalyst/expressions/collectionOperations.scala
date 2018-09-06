@@ -1717,17 +1717,35 @@ case class ArraySelect(
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val arrayName = ctx.freshName("arrayObject")
 
+    val et = dataType.elementType
+
     val arCode = array.genCode(ctx)
     val indCode = indexes.genCode(ctx)
+    val arval = arCode.value
+    val indval = indCode.value
+
+    val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
+    val arrayListName = ctx.addMutableState(listClss, "buffer",
+      v => s"$v = new $listClss();", forceInline = true)
+    val genericArrayClass = classOf[GenericArrayData].getName
+    val ind = ctx.freshName("ind")
+
+    val outOfBoundsCode = if (ignoreOutOfBounds) s"$arrayListName.add(null);"
+    else s"throw new RuntimeException(\"Array selection failed: index \"+$ind+\" is larger " +
+      s"than array length \"+$arval.numElements()+\".\");"
 
     val c = code"""
         |${arCode.code}
         |${indCode.code}
         |${arrayListName}.clear();
+        |int $ind = 0;
         |if(!${arCode.isNull} && !${indCode.isNull}) {
-        |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
-        |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
-        |      $arrayListName.add($i);
+        |  for(int i = 0; i < $indval.numElements(); i ++) {
+        |    $ind = $indval.getInt(i);
+        |    if ($arval.numElements() > $ind) {
+        |      $arrayListName.add(${CodeGenerator.getValue(indval, dataType, ind)});
+        |    } else {
+        |      $outOfBoundsCode
         |    }
         |  }
         |}
@@ -1738,7 +1756,7 @@ case class ArraySelect(
       value = JavaCode.variable(arrayName, dataType))
   }
 
-  override def dataType: DataType = array.dataType
+  override def dataType: ArrayType = array.dataType.asInstanceOf[ArrayType]
 
   override def prettyName: String = "array_select"
 }
