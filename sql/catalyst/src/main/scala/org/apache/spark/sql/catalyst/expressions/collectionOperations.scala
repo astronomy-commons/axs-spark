@@ -1731,8 +1731,8 @@ case class ArraySelect(
     val ind = ctx.freshName("ind")
 
     val outOfBoundsCode = if (ignoreOutOfBounds) s"$arrayListName.add(null);"
-    else s"throw new RuntimeException(\"Array selection failed: index \"+$ind+\" is larger " +
-      s"than array length \"+$arval.numElements()+\".\");"
+    else "throw new RuntimeException(\"Array selection failed: index \"+" + ind + "+\" is larger " +
+      "than array length \"+" + arval + ".numElements()+\".\");"
 
     val c = code"""
         |${arCode.code}
