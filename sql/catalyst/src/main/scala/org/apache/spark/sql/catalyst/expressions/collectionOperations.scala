@@ -2299,8 +2299,6 @@ case class ArrayAllPositions(array: Expression, element: Expression)
   override def prettyName: String = "array_allpositions"
 
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-
-
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
 
     val arrayListName = ctx.addMutableState(listClss, "indexBuffer",
@@ -2314,7 +2312,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     val elCode = element.genCode(ctx)
     val arval = arCode.value
     val elval = elCode.value
-    val getValue = CodeGenerator.getValue(arval, elementType, i)
+    val getValue = CodeGenerator.getValue(arval, arrayElementType, i)
 
     val c = code"""
       |${arCode.code}
