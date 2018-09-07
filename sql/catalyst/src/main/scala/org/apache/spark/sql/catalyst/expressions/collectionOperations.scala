@@ -2219,7 +2219,15 @@ case class ArrayAllPositions(array: Expression, element: Expression)
 
   override def dataType: ArrayType = ArrayType(IntegerType, false)
   val et = dataType.elementType
-  val arrayElementType = array.dataType.asInstanceOf[ArrayType].elementType
+
+  var arrayElementType: DataType = null
+
+  def getDataType() = {
+    if (arrayElementType == null) {
+      arrayElementType = array.dataType.asInstanceOf[ArrayType].elementType
+    }
+    arrayElementType
+  }
 
   override def inputTypes: Seq[AbstractDataType] = {
     val elementType = array.dataType match {
@@ -2267,6 +2275,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     val genericArrayClass = classOf[GenericArrayData].getName
     val i = ctx.freshName("i")
 
+    val artype = getDataType()
     val arCode = array.genCode(ctx)
     val elCode = element.genCode(ctx)
     val arval = arCode.value
@@ -2279,7 +2288,7 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |${arrayListName}.clear();
       |if(!${arCode.isNull}) {
       |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
-      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(arrayElementType, elval, getValue)}) {
+      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(artype, elval, getValue)}) {
       |      $arrayListName.add($i+1);
       |    }
       |  }
