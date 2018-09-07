@@ -19,11 +19,9 @@ package org.apache.spark.sql.catalyst.expressions
 import java.util
 import java.util.{Comparator, TimeZone}
 
-import com.google.common.primitives.Ints
-import org.apache.commons.lang3.ArrayUtils
-
 import scala.collection.mutable
 import scala.reflect.ClassTag
+
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.{TypeCheckResult, TypeCoercion}
 import org.apache.spark.sql.catalyst.expressions.ArraySortLike.NullOrder
