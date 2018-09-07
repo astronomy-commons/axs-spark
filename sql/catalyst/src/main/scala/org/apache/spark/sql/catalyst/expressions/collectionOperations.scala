@@ -1654,22 +1654,27 @@ case class ArrayJoin(
 }
 
 /**
- * Creates a String containing all the elements of the input array separated by the delimiter.
+ * Selects elements from `array` corresponding to indexes from `indexes`.
+ *
+ * If `ignoreOutOfBounds` is set to `true`, null values are returned for the elements whose indexes
+ * are out of bounds. An exception is thrown otherwise.
+ *
+ * @note The indexes are 1 based.
  */
 @ExpressionDescription(
   usage = """
-    _FUNC_(array, delimiter[, nullReplacement]) - Concatenates the elements of the given array
-      using the delimiter and an optional string to replace nulls. If no value is set for
-      nullReplacement, any null value is filtered.""",
+    _FUNC_(array, indexes[, ignoreOutOfBounds]) - Selects elements from the given array
+      using indexes from the second array. If ignoreOutOfBounds is true, null values
+      are returned for such elements. Otherwise, an exception is thrown.""",
   examples = """
     Examples:
-      > SELECT _FUNC_(array('hello', 'world'), ' ');
+      > SELECT _FUNC_(array('hello', 'world'), array(1));
+       hello
+      > SELECT _FUNC_(array('hello', null ,'world'), array(1, 3));
        hello world
-      > SELECT _FUNC_(array('hello', null ,'world'), ' ');
-       hello world
-      > SELECT _FUNC_(array('hello', null ,'world'), ' ', ',');
-       hello , world
-  """, since = "2.4.0")
+      > SELECT _FUNC_(array('hello', null ,'world'), array(4), false);
+       -- exception is thrown
+  """, since = "3.0.0")
 case class ArraySelect(
                       array: Expression,
                       indexes: Expression,
@@ -1988,7 +1993,7 @@ case class ArrayPosition(left: Expression, right: Expression)
       > SELECT _FUNC_(array(3, 2, 1, 3), 3);
        (1, 4)
   """,
-  since = "2.4.0")
+  since = "3.0.0")
 case class ArrayAllPositions(array: Expression, element: Expression)
   extends Expression with ImplicitCastInputTypes {
 
