@@ -1745,7 +1745,7 @@ case class ArraySelect(
         |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
         |    $ind = $indval.getInt($i);
         |    if ($arval.numElements() > $ind) {
-        |      $arrayListName.add(${CodeGenerator.getValue(arval, dataType, ind)});
+        |      $arrayListName.add(${CodeGenerator.getValue(arval, et, ind)});
         |    } else {
         |      $outOfBoundsCode
         |    }
