@@ -1734,7 +1734,6 @@ case class ArraySelect(
       "than array length \"+" + arval + ".numElements()+\".\");"
 
     val c = code"""
-        |if(true) throw RuntimeException("test");
         |${arCode.code}
         |${indCode.code}
         |${arrayListName}.clear();
@@ -1743,7 +1742,7 @@ case class ArraySelect(
         |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
         |    $ind = $indval.getInt($i);
         |    if ($arval.numElements() > $ind) {
-        |      $arrayListName.add(${CodeGenerator.getValue(indval, dataType, ind)});
+        |      $arrayListName.add(${CodeGenerator.getValue(arval, dataType, ind)});
         |    } else {
         |      $outOfBoundsCode
         |    }
