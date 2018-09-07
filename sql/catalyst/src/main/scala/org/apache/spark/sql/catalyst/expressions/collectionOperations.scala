@@ -1734,6 +1734,7 @@ case class ArraySelect(
       "than array length \"+" + arval + ".numElements()+\".\");"
 
     val c = code"""
+        |if(true) throw RuntimeException("test");
         |${arCode.code}
         |${indCode.code}
         |${arrayListName}.clear();
@@ -1749,7 +1750,7 @@ case class ArraySelect(
         |  }
         |}
         |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
-      """
+
 
     ev.copy(code = c,
       value = JavaCode.variable(arrayName, dataType),
@@ -1799,7 +1800,6 @@ case class ArrayMin(child: Expression) extends UnaryExpression with ImplicitCast
       code"""
          |${childGen.code}
          |boolean ${ev.isNull} = true;
-         |if(true) throw RuntimeException("test");
          |$javaType ${ev.value} = ${CodeGenerator.defaultValue(dataType)};
          |if (!${childGen.isNull}) {
          |  for (int $i = 0; $i < ${childGen.value}.numElements(); $i ++) {
