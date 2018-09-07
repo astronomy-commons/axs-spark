@@ -1685,6 +1685,8 @@ case class ArraySelect(
 
   override def foldable: Boolean = children.forall(_.foldable)
 
+  val valueBuffer = scala.collection.mutable.ArrayBuffer.empty[Any]
+
   override def eval(input: InternalRow): Any = {
     val arrayEval = array.eval(input)
     if (arrayEval == null) return null
@@ -1697,25 +1699,27 @@ case class ArraySelect(
 
     val numIds = ids.numElements()
     val arrln = arrayEval.asInstanceOf[ArrayData].numElements()
-    val arrayOut: Array[Any] = new Array(numIds)
+
+    valueBuffer.clear()
 
     for(i <- 0 until numIds) {
-      val id = ids.getInt(i)
+      val id = ids.getInt(i) - 1
       if (id < arrln) {
-        arrayOut(id) = arr.get(i, dt)
+        valueBuffer += arr.get(i, dt)
       } else if (!ignoreOutOfBounds) {
         throw new RuntimeException(s"Array selection failed: index $i is larger " +
           s"than array length $arrln.")
+      } else {
+
       }
     }
 
-    new GenericArrayData(arrayOut)
+    new GenericArrayData(valueBuffer.toArray)
   }
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val arrayName = ctx.freshName("arrayObject")
 
-    val et = dataType.elementType
     val etstr = if (CodeGenerator.isPrimitiveType(et)) {
       CodeGenerator.boxedType(et)
     } else { et.typeName }
@@ -1743,7 +1747,7 @@ case class ArraySelect(
         |int $ind = 0;
         |if(!${arCode.isNull} && !${indCode.isNull}) {
         |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
-        |    $ind = $indval.getInt($i);
+        |    $ind = $indval.getInt($i) - 1;
         |    if ($arval.numElements() > $ind) {
         |      $arrayListName.add(${CodeGenerator.getValue(arval, et, ind)});
         |    } else {
@@ -1754,13 +1758,13 @@ case class ArraySelect(
         |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
         """
 
-
     ev.copy(code = c,
       value = JavaCode.variable(arrayName, dataType),
       isNull = FalseLiteral)
   }
 
   override def dataType: ArrayType = array.dataType.asInstanceOf[ArrayType]
+  val et = dataType.elementType
 
   override def prettyName: String = "array_select"
 }
@@ -1998,6 +2002,8 @@ case class ArrayAllPositions(array: Expression, element: Expression)
   override def children: Seq[Expression] = Seq(array, element)
 
   override def dataType: ArrayType = ArrayType(IntegerType, false)
+  val et = dataType.elementType
+  val arrayElementType = array.dataType.asInstanceOf[ArrayType].elementType
 
   override def inputTypes: Seq[AbstractDataType] = {
     val elementType = array.dataType match {
@@ -2015,24 +2021,26 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     }
   }
 
+  val indexBuffer = scala.collection.mutable.ArrayBuffer.empty[Int]
+
   override def eval(row: InternalRow): Any = {
-    val res = scala.collection.mutable.ArrayBuffer.empty[Int]
     val value = element.eval(row)
     val ar = array.eval(row)
+    indexBuffer.clear()
     if(ar != null) {
       ar.asInstanceOf[ArrayData].foreach(element.dataType, (i, v) =>
         if (v != null && ordering.equiv(v, value)) {
-          res += (i + 1)
+          indexBuffer += (i + 1)
         }
       )
     }
-    new GenericArrayData(res.toArray)
+    new GenericArrayData(indexBuffer.toArray)
   }
 
   override def prettyName: String = "array_allpositions"
 
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val et = dataType.elementType
+
 
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
 
@@ -2055,8 +2063,8 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |${arrayListName}.clear();
       |if(!${arCode.isNull}) {
       |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
-      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
-      |      $arrayListName.add($i);
+      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(arrayElementType, elval, getValue)}) {
+      |      $arrayListName.add($i+1);
       |    }
       |  }
       |}
