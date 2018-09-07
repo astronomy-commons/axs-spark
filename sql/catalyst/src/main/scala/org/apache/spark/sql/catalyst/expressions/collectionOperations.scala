@@ -1716,13 +1716,17 @@ case class ArraySelect(
     val arrayName = ctx.freshName("arrayObject")
 
     val et = dataType.elementType
+    val etstr = if(CodeGenerator.isPrimitiveType(et))
+      CodeGenerator.boxedType(et)
+    else
+      et.typeName
 
     val arCode = array.genCode(ctx)
     val indCode = indexes.genCode(ctx)
     val arval = arCode.value
     val indval = indCode.value
 
-    val listClss = classOf[util.ArrayList[Object]].getName + "<"+et.typeName+">"
+    val listClss = classOf[util.ArrayList[Object]].getName + "<" + etstr + ">"
     val arrayListName = ctx.addMutableState(listClss, "buffer",
       v => s"$v = new $listClss();", forceInline = true)
     val genericArrayClass = classOf[GenericArrayData].getName
