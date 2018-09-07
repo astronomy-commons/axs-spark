@@ -1754,7 +1754,8 @@ case class ArraySelect(
       """
 
     ev.copy(code = c,
-      value = JavaCode.variable(arrayName, dataType))
+      value = JavaCode.variable(arrayName, dataType),
+      isNull = FalseLiteral)
   }
 
   override def dataType: ArrayType = array.dataType.asInstanceOf[ArrayType]
