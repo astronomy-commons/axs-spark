@@ -1980,47 +1980,6 @@ case class ArraySelect(
     val etstr = if (CodeGenerator.isPrimitiveType(elementType)) {
       CodeGenerator.boxedType(elementType)
     } else { elementType.typeName }
-
-    val arCode = array.genCode(ctx)
-    val indCode = indexes.genCode(ctx)
-    val arval = arCode.value
-    val indval = indCode.value
-
-    val listClss = classOf[util.ArrayList[Object]].getName + "<" + etstr + ">"
-    val arrayListName = ctx.addMutableState(listClss, "buffer",
-      v => s"$v = new $listClss();", forceInline = true)
-    val genericArrayClass = classOf[GenericArrayData].getName
-    val ind = ctx.freshName("ind")
-    val i = ctx.freshName("i")
-
-    val outOfBoundsCode = if (ignoreOutOfBounds) s"$arrayListName.add(null);"
-    else "throw new RuntimeException(\"Array selection failed: index \"+" + ind + "+\" is larger " +
-      "than array length \"+" + arval + ".numElements()+\".\");"
-
-    val c = code"""
-        |${arCode.code}
-        |${indCode.code}
-        |${arrayListName}.clear();
-        |int $ind = 0;
-        |if(!${arCode.isNull} && !${indCode.isNull}) {
-        |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
-        |    $ind = $indval.getInt($i) - 1;
-        |    if ($arval.numElements() > $ind) {
-        |      $arrayListName.add(${CodeGenerator.getValue(arval, elementType, ind)});
-        |    } else {
-        |      $outOfBoundsCode
-        |    }
-        |  }
-        |}
-        |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
-        """
-
-    ev.copy(code = c,
-      value = JavaCode.variable(arrayName, dataType),
-      isNull = FalseLiteral)
-  }
-
-  override def dataType: ArrayType = array.dataType.asInstanceOf[ArrayType]
   @transient lazy val elementType = dataType.elementType
 
   override def prettyName: String = "array_select"
@@ -2259,6 +2218,8 @@ case class ArrayAllPositions(array: Expression, element: Expression)
   override def children: Seq[Expression] = Seq(array, element)
 
   override def dataType: ArrayType = ArrayType(IntegerType, false)
+  val et = dataType.elementType
+  val arrayElementType = array.dataType.asInstanceOf[ArrayType].elementType
 
   override def inputTypes: Seq[AbstractDataType] = {
     val elementType = array.dataType match {
@@ -2276,24 +2237,26 @@ case class ArrayAllPositions(array: Expression, element: Expression)
     }
   }
 
+  val indexBuffer = scala.collection.mutable.ArrayBuffer.empty[Int]
+
   override def eval(row: InternalRow): Any = {
-    val res = scala.collection.mutable.ArrayBuffer.empty[Int]
     val value = element.eval(row)
     val ar = array.eval(row)
+    indexBuffer.clear()
     if(ar != null) {
       ar.asInstanceOf[ArrayData].foreach(element.dataType, (i, v) =>
         if (v != null && ordering.equiv(v, value)) {
-          res += (i + 1)
+          indexBuffer += (i + 1)
         }
       )
     }
-    new GenericArrayData(res.toArray)
+    new GenericArrayData(indexBuffer.toArray)
   }
 
   override def prettyName: String = "array_allpositions"
 
   override def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val et = dataType.elementType
+
 
     val listClss = classOf[util.ArrayList[Integer]].getName + "<Integer>"
 
@@ -2316,8 +2279,8 @@ case class ArrayAllPositions(array: Expression, element: Expression)
       |${arrayListName}.clear();
       |if(!${arCode.isNull}) {
       |  for(int $i = 0; $i < $arval.numElements(); $i ++) {
-      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(et, elval, getValue)}) {
-      |      $arrayListName.add($i + 1);
+      |    if (!$arval.isNullAt($i) && ${ctx.genEqual(arrayElementType, elval, getValue)}) {
+      |      $arrayListName.add($i+1);
       |    }
       |  }
       |}
