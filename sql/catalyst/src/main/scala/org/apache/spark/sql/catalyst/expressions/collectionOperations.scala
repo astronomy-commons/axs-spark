@@ -2245,7 +2245,7 @@ case class ArrayPosition(left: Expression, right: Expression)
       > SELECT _FUNC_(array(3, 2, 1, 3), 3);
        (1, 4)
   """,
-  since = "2.4.0")
+  since = "3.0.0")
 case class ArrayAllPositions(array: Expression, element: Expression)
   extends Expression with ImplicitCastInputTypes {
 
