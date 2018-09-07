@@ -1750,6 +1750,7 @@ case class ArraySelect(
         |  }
         |}
         |final ArrayData $arrayName = new $genericArrayClass($arrayListName);
+        """
 
 
     ev.copy(code = c,
