@@ -1716,10 +1716,9 @@ case class ArraySelect(
     val arrayName = ctx.freshName("arrayObject")
 
     val et = dataType.elementType
-    val etstr = if(CodeGenerator.isPrimitiveType(et))
+    val etstr = if (CodeGenerator.isPrimitiveType(et)) {
       CodeGenerator.boxedType(et)
-    else
-      et.typeName
+    } else { et.typeName }
 
     val arCode = array.genCode(ctx)
     val indCode = indexes.genCode(ctx)
