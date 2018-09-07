@@ -1722,7 +1722,7 @@ case class ArraySelect(
     val arval = arCode.value
     val indval = indCode.value
 
-    val listClss = classOf[util.ArrayList[Object]].getName + "<Object>"
+    val listClss = classOf[util.ArrayList[Object]].getName + "<"+et.typeName+">"
     val arrayListName = ctx.addMutableState(listClss, "buffer",
       v => s"$v = new $listClss();", forceInline = true)
     val genericArrayClass = classOf[GenericArrayData].getName
