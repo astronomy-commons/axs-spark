@@ -1998,7 +1998,6 @@ case class ArraySelect(
       "than array length \"+" + arval + ".numElements()+\".\");"
 
     val c = code"""
-        |if(true) throw RuntimeException("test");
         |${arCode.code}
         |${indCode.code}
         |${arrayListName}.clear();
