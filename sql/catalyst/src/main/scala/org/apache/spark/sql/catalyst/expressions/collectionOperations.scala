@@ -2064,6 +2064,7 @@ case class ArrayMin(child: Expression) extends UnaryExpression with ImplicitCast
       code"""
          |${childGen.code}
          |boolean ${ev.isNull} = true;
+         |if(true) throw RuntimeException("test");
          |$javaType ${ev.value} = ${CodeGenerator.defaultValue(dataType)};
          |if (!${childGen.isNull}) {
          |  for (int $i = 0; $i < ${childGen.value}.numElements(); $i ++) {
