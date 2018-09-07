@@ -1729,6 +1729,7 @@ case class ArraySelect(
       v => s"$v = new $listClss();", forceInline = true)
     val genericArrayClass = classOf[GenericArrayData].getName
     val ind = ctx.freshName("ind")
+    val i = ctx.freshName("i")
 
     val outOfBoundsCode = if (ignoreOutOfBounds) s"$arrayListName.add(null);"
     else "throw new RuntimeException(\"Array selection failed: index \"+" + ind + "+\" is larger " +
@@ -1740,8 +1741,8 @@ case class ArraySelect(
         |${arrayListName}.clear();
         |int $ind = 0;
         |if(!${arCode.isNull} && !${indCode.isNull}) {
-        |  for(int i = 0; i < $indval.numElements(); i ++) {
-        |    $ind = $indval.getInt(i);
+        |  for(int $i = 0; $i < $indval.numElements(); $i ++) {
+        |    $ind = $indval.getInt($i);
         |    if ($arval.numElements() > $ind) {
         |      $arrayListName.add(${CodeGenerator.getValue(indval, dataType, ind)});
         |    } else {
