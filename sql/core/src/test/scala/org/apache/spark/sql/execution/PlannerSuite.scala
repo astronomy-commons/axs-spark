@@ -262,7 +262,7 @@ class PlannerSuite extends SharedSQLContext {
           ).queryExecution.executedPlan.collect {
             case exchange: ShuffleExchangeExec => exchange
           }.length
-          assert(numExchanges === 5)
+          assert(numExchanges === 3)
         }
 
         {
@@ -277,7 +277,7 @@ class PlannerSuite extends SharedSQLContext {
           ).queryExecution.executedPlan.collect {
             case exchange: ShuffleExchangeExec => exchange
           }.length
-          assert(numExchanges === 5)
+          assert(numExchanges === 3)
         }
 
       }
@@ -632,7 +632,7 @@ class PlannerSuite extends SharedSQLContext {
         dataType = LongType,
         nullable = false
       ) (exprId = exprId,
-        qualifier = Some("col1_qualifier")
+        qualifier = Seq("col1_qualifier")
       )
 
     val attribute2 =
