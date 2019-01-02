@@ -491,7 +491,6 @@ def isnull(col):
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.isnull(_to_java_column(col)))
 
-
 @since(1.3)
 def last(col, ignorenulls=False):
     """Aggregate function: returns the last value in a group.
@@ -2036,7 +2035,7 @@ def array_select(col, indexes, ignore_out_of_bounds=True):
     """
     sc = SparkContext._active_spark_context
     return Column(sc._jvm.functions.array_select(_to_java_column(col),
-        indexes, ignore_out_of_bounds))
+        _to_java_column(indexes), ignore_out_of_bounds))
 
 @since(2.4)
 def array_remove(col, element):

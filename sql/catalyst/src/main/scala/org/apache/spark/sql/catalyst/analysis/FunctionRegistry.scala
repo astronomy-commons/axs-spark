@@ -415,6 +415,7 @@ object FunctionRegistry {
     expression[ArrayJoin]("array_join"),
     expression[ArrayPosition]("array_position"),
     expression[ArrayAllPositions]("array_allpositions"),
+    expression[ArraySelect]("array_select"),
     expression[ArraySort]("array_sort"),
     expression[ArrayExcept]("array_except"),
     expression[ArrayUnion]("array_union"),
