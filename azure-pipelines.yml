@@ -20,8 +20,10 @@ steps:
     publishJUnitResults: false
     testResultsFiles: '**/surefire-reports/TEST-*.xml'
     goals: 'package'
+
+
 - task: PublishBuildArtifacts@1
   inputs:
     artifactName: 'spark-sql'
-    pathToPublish: 'sql/core/target/'
+    pathtoPublish: 'sql/core/target/'
 
