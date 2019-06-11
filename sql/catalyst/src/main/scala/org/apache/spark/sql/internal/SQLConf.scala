@@ -1340,11 +1340,7 @@ class SQLConf extends Serializable with Logging {
 
   def sortBeforeRepartition: Boolean = getConf(SORT_BEFORE_REPARTITION)
 
-  def topKSortFallbackThreshold: Int = getConf(TOP_K_SORT_FALLBACK_THRESHOLD)
-
   def useSmjInnerRangeOptimization: Boolean = getConf(USE_SMJ_INNER_RANGE_OPTIMIZATION)
-
-  def fastHashAggregateRowMaxCapacityBit: Int = getConf(FAST_HASH_AGGREGATE_MAX_ROWS_CAPACITY_BIT)
 
   /**
    * Returns the [[Resolver]] for the current configuration, which can be used to determine if two
