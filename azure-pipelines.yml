@@ -21,9 +21,13 @@ steps:
     testResultsFiles: '**/surefire-reports/TEST-*.xml'
     goals: 'package'
 
+- task: CopyFiles@2
+  inputs:
+    contents: 'sql/core/target/*.jar'
+    targetFolder: $(Build.ArtifactStagingDirectory)
 
 - task: PublishBuildArtifacts@1
   inputs:
     artifactName: 'spark-sql'
-    pathtoPublish: 'sql/core/target/'
+    pathtoPublish: $(Build.ArtifactStagingDirectory)
 
