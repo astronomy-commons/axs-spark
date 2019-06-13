@@ -15,7 +15,7 @@ jobs:
     inputs:
       mavenPomFile: 'pom.xml'
       mavenOptions: '-Xmx3072m'
-      # options: '-DskipTests'
+      options: '-DskipTests'
       javaHomeOption: 'JDKVersion'
       jdkVersionOption: '1.8'
       jdkArchitectureOption: 'x64'
