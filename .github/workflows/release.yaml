@@ -3,9 +3,6 @@ on:
     # Sequence of patterns matched against refs/tags
     tags:
         - 'axs-v*' # Push events to matching axs-v*
-  create:
-    tags:
-        - 'axs-v*'
 
 name: Create Release
 
