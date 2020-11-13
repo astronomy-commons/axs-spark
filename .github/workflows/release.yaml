@@ -25,7 +25,6 @@ jobs:
     # Build Spark
     - name: Build Spark
       run: |
-        cd ./axs-spark
         ./dev/make-distribution.sh --name axs-spark --tgz -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
         mkdir -p /export
         mv *.tgz /export/axs-spark.tgz
