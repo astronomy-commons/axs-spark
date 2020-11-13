@@ -19,15 +19,9 @@ jobs:
     # Checkout the repository at tag v* (github ref)
     - name: Checkout repository
       uses: actions/checkout@v2
-      with:
-        repository: stevenstetzler/axs-spark
-        path: ./axs-spark
-        ref: ${{ github.ref }}
-        token: ${{ secrets.GITHUB_TOKEN }}
     # Build Spark
     - name: Build Spark
       run: |
-        # build AxsUtilities.jar
         cd ./axs-spark
         ./dev/make-distribution.sh --name axs-spark --tgz -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
         mkdir -p /export
