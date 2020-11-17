@@ -2,7 +2,7 @@ on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
-        - 'axs-v*' # Push events to matching axs-v*
+        - 'v*-axs*' # AXS versions must have -axs appended, plus a counter e.g. "v3.0.0-preview--axs2"
 
 name: Create Release
 
@@ -16,13 +16,14 @@ jobs:
       env:
         MAVEN_OPTS: "-Xmx2g -XX:ReservedCodeCacheSize=1g"
     steps:
-    # Checkout the repository at tag v* (github ref)
     - name: Checkout repository
       uses: actions/checkout@v2
+    - name: Get AXS tag
+      run: echo ${{ github.ref }}  | awk -F- '{print "AXS_NAME="$NF}' >> $GITHUB_ENV
     # Build Spark
     - name: Build Spark
       run: |
-        ./dev/make-distribution.sh --name axs-spark --tgz -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
+        ./dev/make-distribution.sh --name $AXS_NAME --tgz -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
         mkdir -p /export
         mv *.tgz /export/axs-spark.tgz
     # Create the Github Release
