@@ -23,7 +23,7 @@ jobs:
     # Build Spark
     - name: Build Spark
       run: |
-        ./dev/make-distribution.sh --name $AXS_NAME --tgz -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
+        ./dev/make-distribution.sh --name $AXS_NAME --tgz -Dhadoop.version=3.2.2 -Phive -Phive-thriftserver -Pmesos -Pyarn -Pkubernetes -DskipTests
         mkdir -p /export
         mv *.tgz /export/axs-spark.tgz
     # Create the Github Release
